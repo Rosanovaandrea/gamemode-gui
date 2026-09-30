@@ -306,12 +306,18 @@ class OptionRow(Gtk.Box):
         if t == "bool":
             sw = Gtk.Switch(active=bool(spec.default))
             sw.add_css_class("h5")
+            # Gli switch non devono dilatarsi per tutta la larghezza: restano
+            # alla loro dimensione naturale, allineati a sinistra.
+            sw.set_halign(Gtk.Align.START)
+            sw.set_valign(Gtk.Align.CENTER)
+            sw.set_hexpand(False)
             return sw
         if t == "choice":
             return self._build_combo(spec)
         if t == "list":
             return ListEditor(spec)
         entry = Gtk.Entry(text=str(spec.default))
+        entry.set_halign(Gtk.Align.FILL)
         return entry
 
     def _build_spin(self, spec: OptionSpec, digit: bool):
@@ -359,21 +365,29 @@ class OptionRow(Gtk.Box):
         widget.connect(signal, lambda *_: self._on_value_changed())
 
     def _on_include_toggled(self, *_):
-        enabled = self.include.get_active()
-        self._input.set_sensitive(enabled)
-        if not enabled and not self._suppress:
+        # Il checkbox "Includi" aggiorna solo il flag: l'input resta sempre
+        # editabile (chi modifica un valore abilita automaticamente il flag).
+        if not self._suppress:
+            self._set_dimming()
             self._on_change(self.spec.id)
 
     def _on_value_changed(self, *_):
-        self.include.set_active(True)
-        self._input.set_sensitive(True)
+        # La modifica di un valore attiva automaticamente il flag "Includi".
         if not self._suppress:
+            self.include.set_active(True)
+            self._set_dimming()
             self._on_change(self.spec.id)
+
+    def _set_dimming(self) -> None:
+        """Oscura leggermente la riga quando l'opzione non è inclusa nel file."""
+        # Non disabilitiamo mai l'input: solo un'indicazione visiva.
+        opacity = 0.55 if not self.include.get_active() else 1.0
+        self._input.set_opacity(opacity)
 
     # -- API pubblica ----------------------------------------------------------
     def set_include(self, enabled: bool):
         self.include.set_active(bool(enabled))
-        self._input.set_sensitive(bool(enabled))
+        self._set_dimming()
 
     def get_include(self) -> bool:
         return self.include.get_active()
@@ -741,7 +755,7 @@ class GameModeWindow(Adw.ApplicationWindow):
             dlg = confirm_dialog(self, tr("dlg.unsaved.title"),
                                  tr("dlg.unsaved.body"),
                                  confirm=tr("dlg.unsaved.exit"))
-            dlg.present(self)
+            dlg.present()
             dlg.connect("response", self._closed_confirmed)
             return True
         return False
@@ -783,7 +797,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     def do_restore_backup(self) -> None:
         dlg = confirm_dialog(self, tr("dlg.restore_bak.title"),
                              tr("dlg.restore_bak.body"), confirm=tr("btn.restore_backup"))
-        dlg.present(self)
+        dlg.present()
         dlg.connect("response", self._restore_backup_response)
 
     def _restore_backup_response(self, dlg, response: str) -> None:
@@ -802,7 +816,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     def do_restore_orig(self) -> None:
         dlg = confirm_dialog(self, tr("dlg.restore_orig.title"),
                              tr("dlg.restore_orig.body"), confirm=tr("btn.restore_orig"))
-        dlg.present(self)
+        dlg.present()
         dlg.connect("response", self._restore_orig_response)
 
     def _restore_orig_response(self, dlg, response: str) -> None:
@@ -821,7 +835,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     def do_add_group(self, on_done=None) -> None:
         res = core.add_user_to_group()
         dlg = output_dialog(self, tr("dlg.group.title"), res.output, res.success)
-        dlg.present(self)
+        dlg.present()
         dlg.connect("response", lambda *_a: on_done() if on_done else None)
         if res.success:
             dlg.connect("response", lambda *_a: self._run_dialog(
@@ -830,7 +844,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     def do_restart_daemon(self) -> None:
         res = core.restart_daemon()
         dlg = output_dialog(self, tr("dlg.restart.title"), res.output, res.success)
-        dlg.present(self)
+        dlg.present()
 
     def _run_tests(self) -> None:
         """§5.2: test del daemon + versione mostrati in un dialogo."""
@@ -850,7 +864,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         self._run_dialog(info_dialog(self, tr("dlg.help.title"), tr("dlg.help.body")))
 
     def _run_dialog(self, dlg: Adw.MessageDialog) -> None:
-        dlg.present(self)
+        dlg.present()
 
     def _show_toast(self, message: str) -> None:
         self.toast_overlay.add_toast(Adw.Toast(title=message))
