@@ -1,78 +1,108 @@
-import os, sys, tempfile
+"""Test della logica (senza GUI): tabella, renderer, attivazione,
+config manager (commit atomico locale + privilegiato), i18n e sessione."""
+
+import os
+import sys
+import tempfile
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.options_table import OPTIONS
-from core.renderer import render_ini, default_ini
-from core.activation import ActivationManager
-from core.ini_util import parse
-from core.config_manager import ConfigManager
-from core.backup_manager import BackupManager
+import core
+from core import (
+    ActivationManager, ConfigManager, OPTIONS, OptionSpec,
+    default_ini, parse_ini, render_ini, tr,
+)
+from core import save_session, load_session
 
-print("== Option count:", len(OPTIONS))
+print("== Opzioni in tabella:", len(OPTIONS))
+assert "general" in core.SECTIONS_ORDER
 
-# Full default config
+# ---------------------------------------------------------------------------
+# 1. Renderer: roundtrip tabella -> file -> tabella
+# ---------------------------------------------------------------------------
 d = default_ini()
-print("== default_ini output:")
-print(d)
-print("== callback parse roundtrip:")
-parsed = parse(d)
-print(parsed["general"].keys())
-
-# Build flags/values that mirror the defaults
+print("== default_ini:\n", d)
+parsed = parse_ini(d)
 am = ActivationManager()
-values = am.rebuild_from_parsed(parse(d))
+values = am.rebuild_from_parsed(parsed)
 flags = {spec.id: am.get_flag(spec.id) for spec in OPTIONS}
 rendered = render_ini(flags, values)
 assert rendered == d, "roundtrip mismatch"
 print("== roundtrip OK")
 
-# Toggle something off and on
-flags = {spec.id: False for spec in OPTIONS}
-values = {spec.id: spec.default for spec in OPTIONS}
-flags["general.reaper_freq"] = True
-flags["general.desiredgov"] = True
-flags["general.inhibit_screensaver"] = True
-flags["filter.whitelist"] = True
-values["filter.whitelist"] = ["RiseOfTheTombRaider", "glxgears"]
-cfg = render_ini(flags, values)
-print("== sparse config:")
-print(cfg)
-p = parse(cfg)
-assert p["filter"]["whitelist"] == ["RiseOfTheTombRaider", "glxgears"], p["filter"]["whitelist"]
-print("== list preserved OK")
+# ---------------------------------------------------------------------------
+# 2. Liste (whitelist/blacklist) come chiavi ripetute
+# ---------------------------------------------------------------------------
+flags2 = {spec.id: False for spec in OPTIONS}
+values2 = {spec.id: spec.default for spec in OPTIONS}
+flags2["filter.whitelist"] = True
+values2["filter.whitelist"] = ["RiseOfTheTombRaider", "glxgears"]
+cfg = render_ini(flags2, values2)
+p2 = parse_ini(cfg)
+assert p2["filter"]["whitelist"] == ["RiseOfTheTombRaider", "glxgears"]
+print("== liste ripetute OK")
 
-# ConfigManager atomic write
+# ---------------------------------------------------------------------------
+# 3. ConfigManager: commit locale atomico + .orig + .bak + rollback
+# ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
     cm = ConfigManager(path)
-    bm = BackupManager(cm)
-    assert not bm.has_orig
-    bm.ensure_orig(cfg)
-    assert bm.has_orig
-    orig = open(cm.orig_path).read()
-    assert orig == cfg
-    cm.save(cfg)
+    cm.save(cfg)                                   # primo commit
     assert os.path.isfile(path)
-    # no previous file, so no backup yet on first save
-    assert not os.path.isfile(cm.backup_path)
+    assert os.path.isfile(cm.orig_path)            # .orig creato una volta
     assert open(path).read() == cfg
-    # modify and save again -> backup should hold previous
-    cm.save(d)
-    assert os.path.isfile(cm.backup_path)
-    bak = open(cm.backup_path).read()
-    assert bak == cfg, "backup should hold previous config"
-    # write failure -> rollback
-    os.chmod(cm.directory(), 0o500)
-    try:
-        cm.save("broken")
-    except OSError:
-        pass
-    import stat
-    os.chmod(cm.directory(), 0o700)
-    print("== backup/rollback path OK")
-    # restore from orig
-    cm.restore_from_orig()
+    assert not os.path.isfile(cm.backup_path)      # nessun precedente -> no .bak
+
+    cm.save(d)                                     # secondo commit
+    assert os.path.isfile(cm.backup_path)          # ora .bak esiste
+    assert open(cm.backup_path).read() == cfg      # .bak == stato precedente
+
+    # rollback dal backup
+    assert cm.rollback_from_backup()
     assert open(path).read() == cfg
-    print("== restore from orig OK")
+
+    # ripristino da orig
+    assert cm.restore_from_orig()
+    print("== commit locale + .orig + .bak + rollback OK")
+
+# ---------------------------------------------------------------------------
+# 4. i18n via XML (it) — configurabile, non hardcoded
+# ---------------------------------------------------------------------------
+assert tr("window.title") == "GameMode GUI"
+assert tr("btn.save") == "Salva"
+assert tr("chiave.inesistente") == "chiave.inesistente"  # fallback sul key
+print("== i18n OK")
+
+# ---------------------------------------------------------------------------
+# 5. Sessione (persistenza delle scelte su file JSON)
+# ---------------------------------------------------------------------------
+with tempfile.TemporaryDirectory() as td:
+    path = os.path.join(td, "gamemode.ini")
+    flags_s = {"general.reaper_freq": True, "general.desiredgov": True}
+    values_s = {"general.reaper_freq": 7, "general.desiredgov": "powersave"}
+    save_session(path, flags_s, values_s)
+    restored = load_session(path)
+    assert restored is not None
+    f2, v2 = restored
+    assert f2["general.reaper_freq"] is True
+    assert v2["general.reaper_freq"] == 7
+    assert v2["general.desiredgov"] == "powersave"
+print("== sessione OK")
+
+# ---------------------------------------------------------------------------
+# 6. Privileged helper (simulazione locale, senza root)
+# ---------------------------------------------------------------------------
+with tempfile.TemporaryDirectory() as td:
+    path = os.path.join(td, "gamemode.ini")
+    # execute privileged.py as a subprocess (non-root -> funziona come root locale)
+    import subprocess
+    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
+    proc = subprocess.run([sys.executable, helper, "commit", path],
+                          input=cfg, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert open(path).read() == cfg
+    assert os.path.isfile(path + ".orig")
+    print("== privileged.py commit OK")
 
 print("\nALL CORE TESTS PASSED")

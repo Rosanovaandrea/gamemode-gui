@@ -1,37 +1,27 @@
-"""Application entry point for the GameMode GUI."""
+#!/usr/bin/env python3
+"""Entry point della GUI di GameMode.
+
+L'applicazione è divisa in pochi file, come richiesto nel refactoring:
+
+    main.py   → questo file: avvia l'applicazione (delega a ui.main())
+    core.py   → tutta la logica (tabella, renderer, config, i18n, utility)
+    ui.py     → tutta l'interfaccia GTK (divisa per step)
+    privileged.py → helper eseguito come root per scrivere in /etc
+    locale/<lang>.xml → traduzioni (oggi solo italiano, configurabile)
+
+Lanciare con:  python3 main.py
+Per i test forzare un percorso scrivibile:
+    GAMEMODE_CONFIG=/tmp/prova/gamemode.ini python3 main.py
+"""
 
 from __future__ import annotations
 
 import sys
 
-import gi
-
-gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
-
-from gi.repository import Adw, Gio, Gtk
-
-from ui import steps  # noqa: F401  (ensures module imports cleanly)
-from ui.window import GameModeWindow
-
-
-class GameModeApplication(Adw.Application):
-    def __init__(self) -> None:
-        super().__init__(
-            application_id="io.github.gamemodegui.GameModeGui",
-            flags=Gio.ApplicationFlags.FLAGS_NONE,
-        )
-        self._window: Adw.ApplicationWindow | None = None
-
-    def do_activate(self) -> None:
-        if self._window is None:
-            self._window = GameModeWindow(application=self)
-        self._window.present()
-
 
 def main() -> int:
-    app = GameModeApplication()
-    return app.run(sys.argv)
+    from ui import main as _ui_main
+    return _ui_main()
 
 
 if __name__ == "__main__":
