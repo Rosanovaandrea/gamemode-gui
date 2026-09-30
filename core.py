@@ -134,7 +134,6 @@ class OptionSpec:
 GOVERNORS = ["performance", "powersave", "ondemand", "conservative", "schedutil"]
 PROFILES = ["performance", "low-power", "balanced"]
 SOFT_REALTIME = ["auto", "on", "off"]
-IOPRIO = ["0", "1", "2", "3", "4", "5", "6", "7", "off", "reset"]
 AMD_LEVEL = ["auto", "low", "high", "manual"]
 
 
@@ -196,8 +195,9 @@ OPTIONS: list = [
         description=tr("opt.general.renice"),
         comment="; GameMode can renice game processes. You can put any value between 0 and 20 here"),
     OptionSpec(
-        section="general", key="ioprio", type="choice", choices=IOPRIO,
-        default="0", template="ioprio={value}",
+        section="general", key="ioprio", type="int",
+        default=0, min_value=0, max_value=7,
+        template="ioprio={value}",
         description=tr("opt.general.ioprio"),
         comment="; By default, GameMode adjusts the iopriority of clients to BE/0"),
     OptionSpec(

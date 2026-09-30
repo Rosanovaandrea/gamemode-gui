@@ -38,6 +38,9 @@
   <entry id="list.add">Aggiungi</entry>
   <entry id="list.remove.tooltip">Rimuovi</entry>
   <entry id="list.placeholder">Nuovo valore…</entry>
+  <entry id="choice.unset">— (predefinito)</entry>
+  <entry id="stepper.decrease">Diminuisci</entry>
+  <entry id="stepper.increase">Aumenta</entry>
 
   <!-- ===== Pulsanti riepilogo / riavvio ===== -->
   <entry id="btn.save">Salva</entry>
