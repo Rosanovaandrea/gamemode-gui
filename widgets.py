@@ -1,32 +1,35 @@
 """Widget GTK riutilizzabili per la GUI.
 
-Questo modulo raccoglie in un unico posto i *building block* che l'interfaccia
-usa per ogni tipo di opzione; così possono essere riutilizzati ovunque senza
-duplicare codice (per la gestione di più step, per future finestre, ecc.).
+Questo modulo raccoglie i *building block* dell'interfaccia. La costruzione del
+controllo per un'opzione è centralizzata in :func:`build_widget`: si sceglie il
+widget in base ai campi della definizione JSON (``value_type`` / ``widget``), in
+modo che non serva codice ad hoc per ogni opzione. Le uniche differenze per i
+valori "speciali" stanno in ``core.resolve_choices`` (i valori arrivano dal
+sistema), ma il widget resta standard.
 
 Contiene:
 
-  * :class:`ChoicePicker`   — scelta singola SENZA dropdown: un gruppo di
-                             pulsanti radio in un FlowBox. Selezionare una voce
-                             disattiva le altre (come richiesto). Niente popup
-                             => niente problemi di posizionamento dei menù.
-  * :class:`StepperBox`     — valore numerico con pulsanti "-" e "+",
-                             vincolato a min/max (per ioprio, renice, ecc.).
-  * :class:`ListEditor`     — editor di liste (whitelist/blacklist).
-  * :class:`OptionRow`      — riga dichiarativa completa: checkbox "Includi" +
-                             widget costruito in base al tipo della spec.
+  * :func:`build_widget`  — controllo standard per tipo (stepper/switch/radio/list/entry)
+  * :class:`ChoicePicker` — scelta singola SENZA dropdown: radio button in un FlowBox
+  * :class:`StepperBox`   — valore numerico con "-" e "+", vincolato a min/max
+  * :class:`ListEditor`   — editor di liste (whitelist/blacklist)
+  * :class:`OptionRow`    — riga completa: "nome: descrizione" + selettore sotto
 
-Tutti questi widget espongono la stessa interfaccia valori:
-``get_value()`` / ``set_value(v)`` / ``set_sensitive(b)`` e un callback
-``on_change`` invocato quando l'utente modifica il valore.
+Tutti espongono la stessa interfaccia valori: ``get_value()`` / ``set_value(v)``
+/ ``set_sensitive(b)`` e un callback ``on_change``.
 """
 
 from __future__ import annotations
 
 from typing import Callable, List, Optional
 
+import gi
+
+gi.require_version("Gtk", "4.0")
+
 from gi.repository import Gtk
 
+import core
 from core import tr
 
 
@@ -34,29 +37,24 @@ from core import tr
 # Scelta singola a pulsanti radio (niente dropdown)
 # ===========================================================================
 class ChoicePicker(Gtk.Box):
-    """Gruppo di radio-button per scegliere UN valore tra ``choices``.
-
-    Ogni voce è un ``Gtk.ToggleButton``; togglare una voce disattiva
-    automaticamente le altre (comportamento radio), quindi l'utente non deve
-    mai aprire un menù a tendina. Il callback ``on_change`` è chiamato col
-    valore selezionato.
-    """
+    """Gruppo di radio-button per scegliere UN valore tra ``choices``."""
 
     def __init__(
         self,
         choices: List[str],
         on_change: Optional[Callable[[], None]] = None,
         allow_unset: bool = False,
+        labels: Optional[dict] = None,
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        self._choices = list(choices)
-        self._allow_unset = allow_unset
         self._on_change = on_change or (lambda: None)
+        self._labels = dict(labels or {})
         self._buttons: List[Gtk.ToggleButton] = []
+        self._values: List[str] = []
         self._selected: Optional[str] = None
         self._suppress = False
 
-        flow = Gtk.FlowBox(
+        self._flow = Gtk.FlowBox(
             max_children_per_line=8,
             selection_mode=Gtk.SelectionMode.NONE,
             column_spacing=4,
@@ -64,19 +62,20 @@ class ChoicePicker(Gtk.Box):
             valign=Gtk.Align.START,
             halign=Gtk.Align.START,
         )
-        self.append(flow)
+        self.append(self._flow)
 
         if allow_unset:
-            self._add_button(flow, "", label=tr("choice.unset"))
+            self._add_button("", label=tr("choice.unset"))
         for choice in choices:
-            self._add_button(flow, choice)
+            self._add_button(choice)
 
-    def _add_button(self, flow: Gtk.FlowBox, value: str, label: Optional[str] = None):
-        btn = Gtk.ToggleButton(label=label or value)
+    def _add_button(self, value: str, label: Optional[str] = None) -> None:
+        btn = Gtk.ToggleButton(label=label or self._labels.get(value) or value)
         btn.set_group(self._buttons[0] if self._buttons else None)
         btn.connect("toggled", self._on_toggled, value)
         self._buttons.append(btn)
-        flow.append(btn)
+        self._values.append(value)
+        self._flow.append(btn)
 
     def _on_toggled(self, btn: Gtk.ToggleButton, value: str) -> None:
         if self._suppress:
@@ -84,8 +83,6 @@ class ChoicePicker(Gtk.Box):
         if not btn.get_active():
             return
         self._selected = value
-        # Disattiva gli altri (comportamento "uno solo alla volta"). Il gruppo
-        # radio lo farebbe già, ma lo facciamo esplicito per sicurezza.
         for other in self._buttons:
             if other is not btn:
                 self._suppress = True
@@ -97,18 +94,17 @@ class ChoicePicker(Gtk.Box):
     def get_value(self) -> str:
         return self._selected or ""
 
-    def set_value(self, value: str) -> None:
+    def set_value(self, value) -> None:
         value = str(value or "")
+        # Il valore corrente potrebbe non essere tra le scelte (es. governor
+        # non più disponibile): lo aggiungiamo per poterlo mostrare.
+        if value and value not in self._values:
+            self._add_button(value)
         self._selected = value
         self._suppress = True
-        for btn, choice_value in zip(self._buttons, self._value_list()):
+        for btn, choice_value in zip(self._buttons, self._values):
             btn.set_active(choice_value == value)
         self._suppress = False
-
-    def _value_list(self) -> List[str]:
-        vals = [""] if self._allow_unset else []
-        vals.extend(self._choices)
-        return vals
 
     def set_sensitive(self, sensitive: bool) -> None:
         for btn in self._buttons:
@@ -119,10 +115,7 @@ class ChoicePicker(Gtk.Box):
 # Stepper numerico (pulsanti - / + con min e max)
 # ===========================================================================
 class StepperBox(Gtk.Box):
-    """Campo numerico con pulsanti "-" e "+", vincolato tra ``min`` e ``max``.
-
-    Usato per le opzioni numeriche (int e float). Supporta step e decimali.
-    """
+    """Campo numerico con pulsanti "-" e "+", vincolato tra ``min`` e ``max``."""
 
     def __init__(
         self,
@@ -262,19 +255,130 @@ class ListEditor(Gtk.Box):
 
 
 # ===========================================================================
-# Riga dichiarativa per un'opzione (checkbox Includi + widget)
+# Selettore di core (checkbox) per pinning CPU
+# ===========================================================================
+class CoresEditor(Gtk.Box):
+    """Selezione multipla dei core tramite checkbox.
+
+    I core disponibili arrivano dal sistema (``special_source: cpu_cores``).
+    Il valore è la lista ordinata dei core selezionati (es. ``[0, 2, 4]``).
+    """
+
+    def __init__(
+        self,
+        cores: List[str],
+        on_change: Optional[Callable[[], None]] = None,
+    ) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self._on_change = on_change or (lambda: None)
+        self._suppress = False
+        self._checks: dict = {}
+
+        flow = Gtk.FlowBox(
+            max_children_per_line=16,
+            selection_mode=Gtk.SelectionMode.NONE,
+            column_spacing=8,
+            row_spacing=4,
+            valign=Gtk.Align.START,
+            halign=Gtk.Align.START,
+        )
+        for core in cores:
+            key = str(core)
+            chk = Gtk.CheckButton(label=key)
+            chk.connect("toggled", self._on_toggled)
+            flow.append(chk)
+            self._checks[key] = chk
+        self.append(flow)
+
+    def _on_toggled(self, *_):
+        if not self._suppress:
+            self._on_change()
+
+    # -- API valori ---------------------------------------------------------
+    def get_value(self) -> List[int]:
+        return sorted(int(core) for core, chk in self._checks.items()
+                      if chk.get_active())
+
+    def set_value(self, values) -> None:
+        if values is None:
+            values = []
+        if isinstance(values, (str, int)):
+            values = core.expand_cpu_list(str(values))
+        selected = {str(v) for v in values}
+        self._suppress = True
+        for core, chk in self._checks.items():
+            chk.set_active(core in selected)
+        self._suppress = False
+
+    def set_sensitive(self, sensitive: bool) -> None:
+        for chk in self._checks.values():
+            chk.set_sensitive(bool(sensitive))
+
+
+# ===========================================================================
+# Builder standard del controllo (nessun codice ad hoc per opzione)
+# ===========================================================================
+def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
+    """Costruisce il controllo giusto per un'opzione.
+
+    Il tipo del valore e il widget sono descritti nel JSON: qui c'è un unico
+    punto che li traduce in GTK. Per le opzioni speciali cambiano solo le
+    "choices" (risolte da ``core.resolve_choices``), il widget resta standard.
+    """
+    t = spec.type
+    if t in ("int", "float"):
+        is_float = t == "float"
+        return StepperBox(
+            value=float(spec.default or 0),
+            min_value=spec.min_value,
+            max_value=spec.max_value,
+            step=0.1 if is_float else 1,
+            digits=2 if is_float else 0,
+            on_change=on_change,
+        )
+    if t in ("bool", "enable"):
+        if t == "enable":
+            active = str(spec.default) == str(spec.on_value)
+        else:
+            active = bool(spec.default)
+        sw = Gtk.Switch(active=active)
+        sw.add_css_class("h5")
+        sw.set_halign(Gtk.Align.START)
+        sw.set_valign(Gtk.Align.CENTER)
+        sw.set_hexpand(False)
+        sw.connect("notify::active", lambda *_: on_change())
+        return sw
+    if t == "choice":
+        return ChoicePicker(
+            choices=core.resolve_choices(spec),
+            on_change=on_change,
+            allow_unset=(spec.default == ""),
+            labels=spec.choice_labels,
+        )
+    if t == "list":
+        return ListEditor(on_change=on_change)
+    if t == "cores":
+        return CoresEditor(cores=core.resolve_choices(spec), on_change=on_change)
+    # string / fallback
+    entry = Gtk.Entry(text=str(spec.default))
+    entry.connect("changed", lambda *_: on_change())
+    return entry
+
+
+# ===========================================================================
+# Riga dichiarativa per un'opzione ("nome: descrizione" + selettore sotto)
 # ===========================================================================
 class OptionRow(Gtk.Box):
-    """Riga completa per un'opzione della tabella.
+    """Riga completa per un'opzione della definizione JSON.
 
     Struttura:
-        [ ] Includi    <chiave>          <- barra alta
+        <nome opzione>: <descrizione>   <- su una sola riga, ben visibile
         <widget input costruito per tipo>
 
     Comportamento:
-      * l'input è SEMPRE attivo; modificare il valore abilita "Includi";
-      * il checkbox "Includi" controlla solo se l'opzione viene scritta;
-      * quando non inclusa la riga è leggermente attenuata (opacity).
+      * l'input è SEMPRE attivo e ogni modifica propaga il nuovo valore;
+      * la descrizione è mostrata accanto al nome (niente tooltip/popup);
+      * padding interno per dare respiro tra una riga e l'altra.
     """
 
     def __init__(
@@ -282,100 +386,63 @@ class OptionRow(Gtk.Box):
         spec,
         on_change: Optional[Callable[[str], None]] = None,
     ) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.set_margin_top(8)
+        self.set_margin_bottom(8)
+        self.set_margin_start(12)
+        self.set_margin_end(12)
         self._on_change = on_change or (lambda _sid: None)
         self.spec = spec
         self._suppress = False
 
-        # Barra alta: checkbox "Includi" + nome opzione (tooltip descrizione)
-        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.include = Gtk.CheckButton(label=tr("widget.include"))
-        self.include.set_tooltip_text(tr("widget.include.tooltip").format(key=spec.key))
-        title = Gtk.Label(label=spec.key, xalign=0.0, hexpand=True, wrap=True)
-        title.set_tooltip_text(spec.description)
-        bar.append(self.include)
-        bar.append(title)
-        self.append(bar)
+        # Riga alta: nome opzione + descrizione, separati da ":".
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        title = Gtk.Label(label=spec.label, xalign=0.0, wrap=True,
+                          css_classes=["heading"])
+        sep = Gtk.Label(label=":", xalign=0.0, css_classes=["dim-label"])
+        desc = Gtk.Label(label=spec.description, xalign=0.0, wrap=True,
+                         hexpand=True, css_classes=["dim-label"])
+        header.append(title)
+        header.append(sep)
+        header.append(desc)
+        self.append(header)
 
-        # Widget input: costruito per tipo
-        self._input = self._build_input(spec)
+        # Widget input standard, costruito dal tipo della definizione.
+        self._input = build_widget(spec, self._on_value_changed)
         self.append(self._input)
 
-        self.include.connect("toggled", self._on_include_toggled)
-        self._suppress = True
-        self.set_include(False)
-
-    # -- costruzione widget --------------------------------------------------
-    def _build_input(self, spec):
-        t = spec.type
-        if t in ("int", "float"):
-            return StepperBox(
-                value=float(spec.default or 0),
-                min_value=spec.min_value,
-                max_value=spec.max_value,
-                step=0.1 if t == "float" else 1,
-                digits=2 if t == "float" else 0,
-                on_change=self._on_value_changed,
-            )
-        if t == "bool":
-            sw = Gtk.Switch(active=bool(spec.default))
-            sw.add_css_class("h5")
-            sw.set_halign(Gtk.Align.START)
-            sw.set_valign(Gtk.Align.CENTER)
-            sw.set_hexpand(False)
-            sw.connect("notify::active", lambda *_: self._on_value_changed())
-            return sw
-        if t == "choice":
-            return ChoicePicker(
-                choices=list(spec.choices or []),
-                on_change=self._on_value_changed,
-                allow_unset=(spec.default == ""),
-            )
-        if t == "list":
-            return ListEditor(on_change=self._on_value_changed)
-        # string / fallback
-        entry = Gtk.Entry(text=str(spec.default))
-        entry.connect("changed", lambda *_: self._on_value_changed())
-        return entry
-
     # -- segnali --------------------------------------------------------------
-    def _on_include_toggled(self, *_):
-        if not self._suppress:
-            self._set_dimming()
-            self._on_change(self.spec.id)
-
     def _on_value_changed(self, *_):
         if not self._suppress:
-            self.include.set_active(True)
-            self._set_dimming()
             self._on_change(self.spec.id)
 
-    def _set_dimming(self) -> None:
-        opacity = 0.55 if not self.include.get_active() else 1.0
-        self._input.set_opacity(opacity)
-
     # -- API pubblica ----------------------------------------------------------
-    def set_include(self, enabled: bool):
-        self.include.set_active(bool(enabled))
-        self._set_dimming()
-
-    def get_include(self) -> bool:
-        return self.include.get_active()
-
     def set_value(self, value) -> None:
         try:
-            if self.spec.type == "bool":
-                self._input.set_active(bool(value))
+            if self.spec.type in ("bool", "enable"):
+                if self.spec.type == "enable":
+                    self._input.set_active(str(value) == str(self.spec.on_value))
+                else:
+                    self._input.set_active(bool(value))
             else:
                 self._input.set_value(value)
         except (TypeError, ValueError):
             return
-        # Un valore impostato programmaticamente è comunque una modifica:
-        # se non siamo in fase di popolamento iniziale, propaga lo stato.
         if not self._suppress:
-            self.include.set_active(True)
-            self._set_dimming()
             self._on_change(self.spec.id)
 
     def get_value(self):
+        if self.spec.type == "bool":
+            return self._input.get_active()
+        if self.spec.type == "enable":
+            if self._input.get_active():
+                return self.spec.on_value
+            return self.spec.default
         return self._input.get_value()
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Attiva/disattiva la riga (usato per le opzioni dipendenti)."""
+        enabled = bool(enabled)
+        self.set_sensitive(enabled)
+        self._input.set_sensitive(enabled)
+        self.set_opacity(1.0 if enabled else 0.5)

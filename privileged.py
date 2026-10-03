@@ -46,7 +46,7 @@ def _fsync_file(path: str) -> None:
         os.fsync(fh.fileno())
 
 
-def write_new_commit(target: str, content: str) -> None:
+def write_new_commit(target: str, content: str, orig_seed_path: str | None = None) -> None:
     """Esegue un commit atomico di ``content`` su ``target``.
 
     Sequenza (allineata alla specifica):
@@ -69,8 +69,9 @@ def write_new_commit(target: str, content: str) -> None:
 
     # 2. "orig" = stato iniziale, creato UNA sola volta, mai ritoccato.
     #    Se il file attivo esiste lo copiamo; se non esiste (primo avvio) lo
-    #    inizializziamo con il contenuto che stiamo per scrivere.
-    _ensure_orig(target, tmp)
+    #    seed (il file installato dal pacchetto) o il contenuto che stiamo per
+    #    scrivere.
+    _ensure_orig(target, tmp, orig_seed_path)
 
     # 3. backup del file attivo precedente (il "prima" del commit)
     had_previous = os.path.isfile(target)
@@ -96,12 +97,18 @@ def write_new_commit(target: str, content: str) -> None:
             pass
 
 
-def _ensure_orig(target: str, new_content_path: str) -> None:
+def _ensure_orig(target: str, new_content_path: str,
+                 seed_path: str | None = None) -> None:
     """Crea ``<target>.orig`` se non esiste ancora (una volta in assoluto)."""
     orig = target + ".orig"
     if os.path.exists(orig):
         return
-    source = target if os.path.isfile(target) else new_content_path
+    if os.path.isfile(target):
+        source = target
+    elif seed_path and os.path.isfile(seed_path):
+        source = seed_path
+    else:
+        source = new_content_path
     shutil.copy2(source, orig)
     os.chmod(orig, 0o644)
 
@@ -157,7 +164,8 @@ def main(argv: list[str]) -> int:
     try:
         if command == "commit":
             content = sys.stdin.read()
-            write_new_commit(target, content)
+            seed = argv[2] if len(argv) > 2 else None
+            write_new_commit(target, content, seed)
             sys.stdout.write("ok\n")
         elif command == "restore-backup":
             restore_from_backup(target)

@@ -1,12 +1,12 @@
 """Core logico unificato della GUI di GameMode.
 
-Questo modulo raccoglie TUTTA la logica non-GUI dell'applicazione, riducendo
-il numero di file del progetto (refactoring richiesto):
+Questo modulo raccoglie TUTTA la logica non-GUI dell'applicazione:
 
-  * tabella dichiarativa delle opzioni  (single source of truth)
-  * renderer INI (tabella -> testo gamemode.ini)
+  * caricamento delle definizioni delle opzioni da `options.json`
+    (single source of truth: una voce JSON per opzione)
+  * risoluzione dei valori "speciali" letti dal sistema (es. governor CPU)
+  * renderer INI (definizioni + valori -> testo gamemode.ini)
   * lettura INI (conserva le liste ripetute)
-  * flag di attivazione in memoria
   * gestione del file di configurazione (scrittura atomica, backup, rollback),
     sia nel percorso utente sia in /etc (via helper privilegiato)
   * utility per il daemon (test, riavvio, gruppo gamemode)
@@ -25,9 +25,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 # ===========================================================================
 # 1. INTERNAZIONALIZZAZIONE (i18n)
@@ -40,6 +39,11 @@ from typing import Any, Dict, List, Optional
 
 _LOCALE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locale")
 _DEFAULT_LANG = "it"
+
+try:
+    import xml.etree.ElementTree as _ET
+except Exception:  # pragma: no cover
+    _ET = None
 
 
 def _detect_lang() -> str:
@@ -60,11 +64,6 @@ def _detect_lang() -> str:
 class Translator:
     """Carica una tabella di traduzioni da un file XML e fornisce `tr()`.
 
-    Il file XML ha questa forma:
-        <translations>
-          <entry id="window.title">GameMode GUI</entry>
-        </translations>
-
     Se una chiave non esiste, viene restituita la chiave stessa (fallback
     visibile, mai un crash).
     """
@@ -75,15 +74,16 @@ class Translator:
         self._load()
 
     def _load(self) -> None:
+        if _ET is None:
+            return
         path = os.path.join(_LOCALE_DIR, f"{self.lang}.xml")
         if not os.path.isfile(path):
-            # Niente file per la lingua -> usa la lingua di default
             path = os.path.join(_LOCALE_DIR, f"{_DEFAULT_LANG}.xml")
         if not os.path.isfile(path):
             return
         try:
-            root = ET.parse(path).getroot()
-        except (ET.ParseError, OSError):
+            root = _ET.parse(path).getroot()
+        except Exception:
             return
         for entry in root.findall("entry"):
             key = entry.get("id")
@@ -103,10 +103,25 @@ def tr(key: str) -> str:
 
 
 # ===========================================================================
-# 2. TABELLA DICHIARATIVA DELLE OPZIONI
+# 2. DEFINIZIONI DELLE OPZIONI (caricate da options.json)
 # ===========================================================================
-# Ogni opzione di gamemode.ini è descritta UNA volta, qui. L'ordine delle
-# voci definisce l'ordine di scrittura nel file di output.
+# Ogni opzione è descritta UNA volta, come voce JSON. I campi:
+#
+#   key             nome della chiave INI
+#   description_id  chiave i18n della descrizione
+#   label_id        (opzionale) chiave i18n del nome visibile (default: key)
+#   value_type      int | float | bool | string | choice | list | enable
+#   widget          stepper | switch | radio | list | entry
+#   range           [min, max] per i numerici (null = illimitato)
+#   choices         valori ammessi per value_type "choice"
+#   default         valore di default
+#   special         true se i valori vanno letti dal sistema
+#   special_source  sorgente per i valori speciali (es. "cpu_governors")
+#   on_value        per value_type "enable": valore scritto quando è attivo
+#   depends_on      id di un'altra opzione da cui questa dipende
+#   comment         commento emesso nel file INI sopra l'opzione
+
+_OPTIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "options.json")
 
 
 @dataclass(frozen=True)
@@ -115,155 +130,244 @@ class OptionSpec:
 
     section: str
     key: str
-    type: str  # int | float | bool | string | choice | list
+    type: str
     default: Any
     template: str
     description: str
+    description_id: str = ""
+    label_id: Optional[str] = None
+    widget: str = "entry"
+    special: bool = False
+    special_source: Optional[str] = None
     choices: Optional[list] = None
+    choice_labels: Optional[dict] = None
     min_value: Optional[float] = None
     max_value: Optional[float] = None
-    unsafe: bool = False
-    comment: str = ""  # commento emesso sopra l'opzione quando attiva
-    standalone: bool = False  # chiavi senza valore, agganciate a un genitore
+    on_value: Optional[str] = None
+    depends_on: Optional[str] = None
+    comment: str = ""
 
     @property
     def id(self) -> str:
         return f"{self.section}.{self.key}"
 
-
-GOVERNORS = ["performance", "powersave", "ondemand", "conservative", "schedutil"]
-PROFILES = ["performance", "low-power", "balanced"]
-SOFT_REALTIME = ["auto", "on", "off"]
-AMD_LEVEL = ["auto", "low", "high", "manual"]
+    @property
+    def label(self) -> str:
+        return tr(self.label_id) if self.label_id else self.key
 
 
-def _choice(section, key, choices, default, comment, description, unsafe=False):
+@dataclass(frozen=True)
+class Category:
+    """Categoria (sezione INI + scheda) con le sue opzioni."""
+
+    id: str
+    tab_id: str
+    title_id: str
+    subtitle_id: str
+    banner_id: Optional[str]
+    options: tuple
+
+
+def _spec_from_json(section: str, raw: dict) -> OptionSpec:
+    key = raw["key"]
+    rng = raw.get("range") or [None, None]
     return OptionSpec(
-        section=section, key=key, type="choice", choices=choices, default=default,
-        template=f"{key}={{value}}", description=description, comment=comment,
-        unsafe=unsafe,
+        section=section,
+        key=key,
+        type=raw.get("value_type", "string"),
+        default=raw.get("default"),
+        template=f"{key}={{value}}",
+        description=tr(raw["description_id"]),
+        description_id=raw["description_id"],
+        label_id=raw.get("label_id"),
+        widget=raw.get("widget", "entry"),
+        special=bool(raw.get("special", False)),
+        special_source=raw.get("special_source"),
+        choices=raw.get("choices"),
+        choice_labels=raw.get("choice_labels"),
+        min_value=rng[0] if rng else None,
+        max_value=rng[1] if len(rng) > 1 else None,
+        on_value=raw.get("on_value"),
+        depends_on=raw.get("depends_on"),
+        comment=raw.get("comment", ""),
     )
 
 
-def _repeated_list(section, key, comment, description, unsafe=False):
-    return OptionSpec(
-        section=section, key=key, type="list", default=[],
-        template=f"{key}={{value}}", description=description, comment=comment,
-        unsafe=unsafe,
-    )
+def load_categories(path: str = _OPTIONS_FILE) -> List[Category]:
+    """Carica le categorie e le opzioni da ``options.json``."""
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    categories: List[Category] = []
+    for cat in data.get("categories", []):
+        section = cat["id"]
+        specs = tuple(_spec_from_json(section, raw) for raw in cat.get("options", []))
+        categories.append(Category(
+            id=section,
+            tab_id=cat.get("tab_id", f"tab.{section}"),
+            title_id=cat.get("title_id", f"step.{section}.title"),
+            subtitle_id=cat.get("subtitle_id", f"step.{section}.subtitle"),
+            banner_id=cat.get("banner_id"),
+            options=specs,
+        ))
+    return categories
 
 
-OPTIONS: list = [
-    # ---------------------------- [general] ------------------------------
-    OptionSpec(
-        section="general", key="reaper_freq", type="int", default=5, min_value=1,
-        template="reaper_freq={value}",
-        description=tr("opt.general.reaper_freq"),
-        comment=("; The reaper thread will check every 5 seconds for exited "
-                 "clients, for config file changes, and for the CPU/iGPU "
-                 "power balance"),
-    ),
-    _choice("general", "desiredgov", GOVERNORS, "performance",
-            "; The desired governor is used when entering GameMode instead of \"performance\"",
-            tr("opt.general.desiredgov")),
-    _choice("general", "defaultgov", GOVERNORS, "",
-            ("; The default governor is used when leaving GameMode instead of "
-             "restoring the original value"),
-            tr("opt.general.defaultgov")),
-    _choice("general", "desiredprof", PROFILES, "performance",
-            "; The desired platform profile is used when entering GameMode instead of \"performance\"",
-            tr("opt.general.desiredprof")),
-    _choice("general", "defaultprof", PROFILES, "",
-            ("; The default platform profile is used when leaving GameMode "
-             "instead of restoring the original value"),
-            tr("opt.general.defaultprof")),
-    _choice("general", "igpu_desiredgov", GOVERNORS, "powersave",
-            "; The iGPU desired governor is used when the integrated GPU is under heavy load",
-            tr("opt.general.igpu_desiredgov")),
-    OptionSpec(
-        section="general", key="igpu_power_threshold", type="float",
-        default=0.3, min_value=-1.0, max_value=1.0,
-        template="igpu_power_threshold={value}",
-        description=tr("opt.general.igpu_power_threshold"),
-        comment="; Threshold to use to decide when the integrated GPU is under heavy load"),
-    _choice("general", "softrealtime", SOFT_REALTIME, "off",
-            "; GameMode can change the scheduler policy to SCHED_ISO on kernels which support it",
-            tr("opt.general.softrealtime")),
-    OptionSpec(
-        section="general", key="renice", type="int", default=0,
-        min_value=0, max_value=20, template="renice={value}",
-        description=tr("opt.general.renice"),
-        comment="; GameMode can renice game processes. You can put any value between 0 and 20 here"),
-    OptionSpec(
-        section="general", key="ioprio", type="int",
-        default=0, min_value=0, max_value=7,
-        template="ioprio={value}",
-        description=tr("opt.general.ioprio"),
-        comment="; By default, GameMode adjusts the iopriority of clients to BE/0"),
-    OptionSpec(
-        section="general", key="inhibit_screensaver", type="bool", default=True,
-        template="inhibit_screensaver={value}",
-        description=tr("opt.general.inhibit_screensaver"),
-        comment="; Sets whether gamemode will inhibit the screensaver when active"),
-    OptionSpec(
-        section="general", key="disable_splitlock", type="bool", default=True,
-        template="disable_splitlock={value}",
-        description=tr("opt.general.disable_splitlock"),
-        comment="; Sets whether gamemode will disable split lock mitigation when active"),
-
-    # ---------------------------- [filter] ------------------------------
-    _repeated_list("filter", "whitelist",
-                   comment=("; If \"whitelist\" entry has a value(s)\n"
-                            "; gamemode will reject anything not in the whitelist"),
-                   description=tr("opt.filter.whitelist")),
-    _repeated_list("filter", "blacklist",
-                   comment="; Gamemode will always reject anything in the blacklist",
-                   description=tr("opt.filter.blacklist")),
-
-    # ---------------------------- [gpu] ----------------------------------
-    OptionSpec(
-        section="gpu", key="apply_gpu_optimisations", type="choice",
-        choices=["accept-responsibility", "0"], default="0",
-        template="apply_gpu_optimisations={value}",
-        description=tr("opt.gpu.apply_gpu_optimisations"),
-        comment=("; Warning: Use these settings at your own risk. Any damage "
-                 "to hardware is your responsibility and yours alone"),
-        unsafe=True),
-    OptionSpec(
-        section="gpu", key="gpu_device", type="int", default=0, min_value=0,
-        template="gpu_device={value}", description=tr("opt.gpu.gpu_device"),
-        comment="; The DRM device number on the system (usually 0)", unsafe=True),
-    OptionSpec(
-        section="gpu", key="nv_powermizer_mode", type="choice",
-        choices=["0", "1", "2"], default="1",
-        template="nv_powermizer_mode={value}",
-        description=tr("opt.gpu.nv_powermizer_mode"),
-        comment=("; Nvidia specific settings\n"
-                 "; Requires the coolbits extension activated in nvidia-xconfig"),
-        unsafe=True),
-    OptionSpec(
-        section="gpu", key="nv_core_clock_mhz_offset", type="int", default=0,
-        template="nv_core_clock_mhz_offset={value}",
-        description=tr("opt.gpu.nv_core_clock_mhz_offset"), unsafe=True),
-    OptionSpec(
-        section="gpu", key="nv_mem_clock_mhz_offset", type="int", default=0,
-        template="nv_mem_clock_mhz_offset={value}",
-        description=tr("opt.gpu.nv_mem_clock_mhz_offset"), unsafe=True),
-    _choice("gpu", "amd_performance_level", AMD_LEVEL, "high",
-            comment=("; AMD specific settings\n"
-                     "; Requires a relatively up to date AMDGPU kernel module"),
-            description=tr("opt.gpu.amd_performance_level"), unsafe=True),
-]
-
-SECTIONS_ORDER = ["general", "filter", "gpu"]
+CATEGORIES: List[Category] = load_categories()
+OPTIONS: List[OptionSpec] = [spec for cat in CATEGORIES for spec in cat.options]
+SECTIONS_ORDER: List[str] = [cat.id for cat in CATEGORIES]
+OPTIONS_BY_ID: Dict[str, OptionSpec] = {spec.id: spec for spec in OPTIONS}
 
 
 def options_for_section(section: str) -> list:
-    return [opt for opt in OPTIONS if opt.section == section and not opt.standalone]
+    return [opt for opt in OPTIONS if opt.section == section]
 
 
 # ===========================================================================
-# 3. RENDERER (tabella dichiarativa -> testo gamemode.ini)
+# 3. PERCORSI DI CONFIGURAZIONE (ordine di caricamento del daemon)
+# ===========================================================================
+# GameMode carica in quest'ordine e fonde:
+#   1. <datadir>/gamemode/gamemode.ini   (file installato dal pacchetto, "base")
+#   2. /etc/gamemode.ini                 (override dell'amministratore)
+#   3. ~/.config/gamemode.ini            (utente)
+#   4. $PWD/gamemode.ini                 (locale)
+# La GUI usa il file installato come "base" e scrive gli override in /etc.
+# Il percorso del file installato dipende dal prefix di build: lo rileviamo.
+
+def resolve_base_path() -> Optional[str]:
+    """Individua il gamemode.ini installato dal pacchetto (o None).
+
+    Ordine di ricerca: variabile GAMEMODE_BASE (per i test), poi
+    $XDG_DATA_DIRS, infine /usr/local/share e /usr/share. Ogni candidate è
+    ``<datadir>/gamemode/gamemode.ini``.
+    """
+    if "GAMEMODE_BASE" in os.environ:
+        value = os.environ.get("GAMEMODE_BASE", "").strip()
+        return value or None
+    xdg = os.environ.get("XDG_DATA_DIRS", "").strip()
+    data_dirs = [d for d in xdg.split(":") if d] if xdg else []
+    data_dirs += ["/usr/local/share", "/usr/share"]
+    for data_dir in data_dirs:
+        path = os.path.join(data_dir, "gamemode", "gamemode.ini")
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def read_ini_comments(text: str) -> Dict[str, str]:
+    """Estrae i commenti che precedono ogni chiave: {"section.key": "; ..."}."""
+    comments: Dict[str, str] = {}
+    section = None
+    pending: List[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            pending = []
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            pending = []
+            continue
+        if line.startswith(";") or line.startswith("#"):
+            pending.append(line)
+            continue
+        if section and ("=" in line or ":" in line):
+            sep = "=" if "=" in line else ":"
+            name = line.split(sep, 1)[0].strip()
+            if pending:
+                comments[f"{section}.{name}"] = "\n".join(pending)
+            pending = []
+        else:
+            pending = []
+    return comments
+
+
+def load_base_comments(path: Optional[str]) -> Dict[str, str]:
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return read_ini_comments(fh.read())
+    except OSError:
+        return {}
+
+
+# ===========================================================================
+# 4. VALORI SPECIALI (letti dal sistema)
+# ===========================================================================
+# Alcune opzioni (es. il governor CPU) non hanno una lista statica di valori:
+# vanno ricavate da fattori esterni. Per queste `special` è true e
+# `special_source` indica la sorgente.
+
+_SYSFS_GOVERNORS = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+_FALLBACK_GOVERNORS = ["performance", "powersave", "ondemand", "conservative", "schedutil"]
+
+
+def get_cpu_governors() -> List[str]:
+    """Elenca i governor CPU disponibili sul sistema (con fallback statico)."""
+    try:
+        with open(_SYSFS_GOVERNORS, "r", encoding="utf-8") as fh:
+            governors = fh.read().split()
+        if governors:
+            return governors
+    except OSError:
+        pass
+    return list(_FALLBACK_GOVERNORS)
+
+
+SPECIAL_SOURCES: Dict[str, Callable[[], List[str]]] = {
+    "cpu_governors": get_cpu_governors,
+}
+
+_SYSFS_ONLINE = "/sys/devices/system/cpu/online"
+
+
+def expand_cpu_list(text: str) -> List[int]:
+    """Espande una cpu-list di Linux (es. "0-3,8") in una lista di interi."""
+    cores: List[int] = []
+    for token in str(text).split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            start, _, end = token.partition("-")
+            try:
+                cores.extend(range(int(start), int(end) + 1))
+            except ValueError:
+                continue
+        else:
+            try:
+                cores.append(int(token))
+            except ValueError:
+                pass
+    return sorted(set(cores))
+
+
+def get_cpu_cores() -> List[str]:
+    """Elenca i core online del sistema (con fallback su os.cpu_count)."""
+    try:
+        with open(_SYSFS_ONLINE, "r", encoding="utf-8") as fh:
+            cores = expand_cpu_list(fh.read().strip())
+        if cores:
+            return [str(c) for c in cores]
+    except OSError:
+        pass
+    return [str(i) for i in range(os.cpu_count() or 1)]
+
+
+SPECIAL_SOURCES["cpu_cores"] = get_cpu_cores
+
+
+def resolve_choices(spec: OptionSpec) -> List[str]:
+    """Valori ammessi per un'opzione: statici o letti dal sistema se special."""
+    if spec.special:
+        source = SPECIAL_SOURCES.get(spec.special_source or "")
+        if source is not None:
+            return source()
+    return list(spec.choices or [])
+
+
+# ===========================================================================
+# 5. RENDERER (definizioni + valori -> testo gamemode.ini)
 # ===========================================================================
 
 def escape_value(text: str) -> str:
@@ -278,6 +382,8 @@ def escape_value(text: str) -> str:
 def render_option(spec: OptionSpec, value) -> str:
     if spec.type == "bool":
         return spec.template.format(value=1 if value else 0)
+    if spec.type == "cores":
+        return spec.template.format(value=",".join(str(c) for c in value))
     if spec.type == "list":
         return "\n".join(spec.template.format(value=escape_value(item)) for item in value)
     if spec.type == "string":
@@ -285,44 +391,80 @@ def render_option(spec: OptionSpec, value) -> str:
     return spec.template.format(value=value)
 
 
-def render_ini(flags: Dict[str, bool], values: Dict[str, object]) -> str:
-    """Genera il contenuto completo del file gamemode.ini.
+def is_written(spec: OptionSpec, value) -> bool:
+    """True se l'opzione deve comparire nel file.
 
-    Per ogni sezione (nell'ordine di SECTIONS_ORDER) e per ogni opzione attiva
-    (flag True) emette commento + riga formattata. L'output è deterministico e
-    sono preservati commenti e ordine dichiarati nella tabella.
+    Le opzioni vengono scritte **solo se attive**, cioè se il loro valore
+    differisce dal default (o, per le liste, se non sono vuote). I default non
+    vengono scritti perché GameMode li applica già da sé.
     """
+    if spec.type in ("list", "cores"):
+        return bool(value)
+    if spec.type == "bool":
+        return bool(value) != bool(spec.default)
+    if spec.type in ("string", "choice", "enable"):
+        if value is None or str(value) == "":
+            return False
+        return str(value) != str(spec.default)
+    return value is not None and value != spec.default
+
+
+def dependency_met(spec: OptionSpec, values: Dict[str, object]) -> bool:
+    """True se l'eventuale opzione da cui `spec` dipende è attiva."""
+    if not spec.depends_on:
+        return True
+    dep_spec = OPTIONS_BY_ID.get(spec.depends_on)
+    if dep_spec is None:
+        return True
+    return is_written(dep_spec, values.get(dep_spec.id, dep_spec.default))
+
+
+def render_ini(values: Dict[str, object], comments: Optional[Dict[str, str]] = None) -> str:
+    """Genera il contenuto del file gamemode.ini.
+
+    Per ogni categoria (nell'ordine di options.json) emette commento + riga
+    formattata **solo per le opzioni attive** (valore diverso dal default e
+    dipendenza soddisfatta). I commenti possono arrivare dal file installato
+    (``comments``), con fallback su quelli della definizione.
+    """
+    comments = comments or {}
     lines: list = []
     for section in SECTIONS_ORDER:
         section_lines = []
         for spec in OPTIONS:
             if spec.section != section:
                 continue
-            if not flags.get(spec.id, False):
-                continue
             value = values.get(spec.id, spec.default)
-            if spec.type == "list" and not value:
+            if not dependency_met(spec, values):
                 continue
-            if spec.comment:
-                section_lines.append(spec.comment)
+            if not is_written(spec, value):
+                continue
+            comment = comments.get(spec.id, spec.comment)
+            if comment:
+                section_lines.append(comment)
             section_lines.append(render_option(spec, value))
         if section_lines:
             if lines:
                 lines.append("")
             lines.append(f"[{section}]")
             lines.extend(section_lines)
+    if not lines:
+        return ""
     return "\n".join(lines) + "\n"
 
 
+def default_values() -> Dict[str, object]:
+    """Valori di default di tutte le opzioni."""
+    return {spec.id: spec.default for spec in OPTIONS}
+
+
 def default_ini() -> str:
-    """Genera il file "di default" dalla tabella (tutte le opzioni attive)."""
-    flags = {spec.id: True for spec in OPTIONS}
-    values = {spec.id: spec.default for spec in OPTIONS}
-    return render_ini(flags, values)
+    """File con tutte le opzioni ai valori di default (vuoto, con questa logica)."""
+    return render_ini(default_values())
 
 
 # ===========================================================================
-# 4. LETTURA INI (conserva chiavi ripetute per le liste)
+# 6. LETTURA INI (conserva chiavi ripetute per le liste)
 # ===========================================================================
 
 def strip_inline_comment(value: str) -> str:
@@ -333,11 +475,7 @@ def strip_inline_comment(value: str) -> str:
 
 
 def parse_ini(text: str) -> Dict[str, Dict[str, List[str]]]:
-    """Parsa un testo INI in section -> key -> [values].
-
-    Usa liste di valori perché le chiavi ripetute (whitelist/blacklist) vanno
-    preservate completamente.
-    """
+    """Parsa un testo INI in section -> key -> [values]."""
     result: Dict[str, Dict[str, List[str]]] = {}
     section = None
     current_key = None
@@ -371,91 +509,98 @@ def parse_ini_file(path: str) -> Dict[str, Dict[str, List[str]]]:
 
 
 # ===========================================================================
-# 5. FLAG DI ATTIVAZIONE (stato in memoria delle scelte)
+# 7. VALORI DELLE OPZIONI (stato in memoria)
 # ===========================================================================
-# Le scelte dell'utente vivono in memoria come un dizionario di flag booleani
-# + un dizionario di valori. Al commit vengono persistite su file. Ricostruiti
-# all'avvio leggendo il file esistente (chiave presente => flag True).
+
+def _parse_scalar(kind: str, raw_list: List[str]) -> object:
+    if not raw_list:
+        return None
+    raw = raw_list[-1] if len(raw_list) == 1 else ",".join(raw_list)
+    try:
+        if kind == "int":
+            return int(raw)
+        if kind == "float":
+            return float(raw)
+        if kind == "bool":
+            return raw.strip() not in ("0", "false", "no")
+    except ValueError:
+        return None
+    return raw
 
 
-class ActivationManager:
-    def __init__(self) -> None:
-        self._flags: Dict[str, bool] = {}
+def values_from_parsed(parsed, base: Optional[Dict[str, object]] = None) -> Dict[str, object]:
+    """Costruisce i valori correnti a partire da un INI già parsato.
 
-    def set_flag(self, option_id: str, enabled: bool) -> None:
-        self._flags[option_id] = enabled
-
-    def get_flag(self, option_id: str) -> bool:
-        return self._flags.get(option_id, False)
-
-    def enable(self, option_id: str) -> None:
-        self._flags[option_id] = True
-
-    def take_snapshot(self) -> Dict[str, bool]:
-        return dict(self._flags)
-
-    @staticmethod
-    def _parse_scalar(kind: str, raw_list: List[str]) -> object:
-        if not raw_list:
-            return None
-        raw = raw_list[-1] if len(raw_list) == 1 else ",".join(raw_list)
-        try:
-            if kind == "int":
-                return int(raw)
-            if kind == "float":
-                return float(raw)
-            if kind == "bool":
-                return raw.strip() not in ("0", "false", "no")
-        except ValueError:
-            return None
-        return raw
-
-    def rebuild_from_parsed(self, parsed) -> Dict[str, object]:
-        values: Dict[str, object] = {}
-        for spec in OPTIONS:
-            raw_values = parsed.get(spec.section, {}).get(spec.key)
-            if raw_values:
-                self._flags[spec.id] = True
-                if spec.type == "list":
-                    values[spec.id] = [v.strip() for v in raw_values if v.strip()]
-                else:
-                    values[spec.id] = self._parse_scalar(spec.type, raw_values)
+    Con ``base`` fornisce i valori di partenza (es. dal file installato): le
+    chiavi presenti in ``parsed`` li sovrascrivono, tranne le liste che in
+    GameMode si accodano.
+    """
+    if base is not None:
+        values: Dict[str, object] = dict(base)
+    else:
+        values = {spec.id: spec.default for spec in OPTIONS}
+    for spec in OPTIONS:
+        raw_values = parsed.get(spec.section, {}).get(spec.key)
+        if not raw_values:
+            continue
+        if spec.type == "list":
+            parsed_list = [v.strip() for v in raw_values if v.strip()]
+            existing = values.get(spec.id)
+            if base is not None and isinstance(existing, list):
+                values[spec.id] = existing + parsed_list
             else:
-                self._flags[spec.id] = False
+                values[spec.id] = parsed_list
+        elif spec.type == "cores":
+            values[spec.id] = expand_cpu_list(",".join(raw_values))
+        else:
+            parsed_value = _parse_scalar(spec.type, raw_values)
+            if parsed_value is not None:
+                values[spec.id] = parsed_value
+            elif base is None:
                 values[spec.id] = spec.default
-        return values
+    return values
 
-    def rebuild_from_file(self, path: Optional[str]) -> Dict[str, object]:
-        if path is not None and os.path.isfile(path):
+
+def load_values_from_file(path: Optional[str]) -> Dict[str, object]:
+    """Legge i valori da un singolo file, completando con i default."""
+    return load_effective_values(None, path)
+
+
+def load_effective_values(base_path: Optional[str],
+                          override_path: Optional[str]) -> Dict[str, object]:
+    """Valori effettivi = default, poi file installato, poi override /etc.
+
+    Riproduce l'ordine di merge del daemon (le liste si accodano, i valori
+    scalari vengono sovrascritti).
+    """
+    values = default_values()
+    for path in (base_path, override_path):
+        if path and os.path.isfile(path):
             try:
-                return self.rebuild_from_parsed(parse_ini_file(path))
+                values = values_from_parsed(parse_ini_file(path), values)
             except OSError:
                 pass
-        # Default (flag tutti False, valori di default)
-        self._flags = {}
-        values = {spec.id: spec.default for spec in OPTIONS}
-        for spec in OPTIONS:
-            self._flags[spec.id] = False
-        return values
+    return values
 
 
 # ===========================================================================
-# 6. GESTIONE FILE DI CONFIGURAZIONE (scrittura atomica + backup)
+# 8. GESTIONE FILE DI CONFIGURAZIONE (scrittura atomica + backup)
 # ===========================================================================
 # - target in /etc/gamemode.ini: richiede privilegi => delega a privileged.py
 #   via pkexec (o sudo). In ogni caso l'operazione è atomica e con rollback.
 # - target in un percorso scrivibile (es. .config per test): operazione locale.
 
-
-def _privileged_argv(command: str, path: str) -> List[str]:
+def _privileged_argv(command: str, path: str,
+                     extra_args: Optional[List[str]] = None) -> List[str]:
     """Costruisce la riga di comando per l'helper privilegiato."""
     helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
-    return [sys.executable, helper, command, path]
+    return [sys.executable, helper, command, path] + list(extra_args or [])
 
 
-def run_privileged(command: str, path: str, content: str = "", timeout: int = 60) -> subprocess.CompletedProcess:
+def run_privileged(command: str, path: str, content: str = "", timeout: int = 60,
+                   extra_args: Optional[List[str]] = None) -> subprocess.CompletedProcess:
     """Esegue un'operazione privilegiata provando pkexec poi sudo."""
-    argv = _privileged_argv(command, path)
+    argv = _privileged_argv(command, path, extra_args)
     for prefix in (["pkexec"], ["sudo", "-n"]):
         try:
             return subprocess.run(
@@ -475,22 +620,18 @@ def is_privileged_path(path: str) -> bool:
 
 
 class ConfigManager:
-    """Gestisce il file gamemode.ini: lettura, commit atomico, backup, rollback.
+    """Gestisce il file gamemode.ini: lettura, commit atomico, backup, rollback."""
 
-    Il "commit" di un file in /etc riscrive TUTTO il file (copy-on-write su
-    .tmp + os.replace); il file attivo precedente viene salvato in `.bak` e
-    lo stato "vergine" iniziale in `.orig` (creato una sola volta).
-    """
-
-    def __init__(self, config_path: str) -> None:
+    def __init__(self, config_path: str, orig_seed: str = "") -> None:
         self.config_path = config_path
         self.backup_path = config_path + ".bak"
         self.orig_path = config_path + ".orig"
         self.tmp_path = config_path + ".tmp"
+        # Contenuto del file installato (base): usato come ".orig" al primo
+        # commit se il file attivo non esiste ancora.
+        self.orig_seed = orig_seed
 
-    # -- lettura -----------------------------------------------------------
     def read_existing(self) -> str:
-        """Restituisce il contenuto del file attivo, oppure stringa vuota."""
         try:
             if os.path.isfile(self.config_path):
                 with open(self.config_path, "r", encoding="utf-8") as fh:
@@ -499,24 +640,39 @@ class ConfigManager:
             pass
         return ""
 
-    # -- commit ------------------------------------------------------------
     def save(self, content: str) -> None:
-        """Salva `content` con strategia atomica+backup.
-
-        In /etc delega a privileged.py (pkexec/sudo). A prescindere dal
-        percorso l'operazione garantisce: .orig una volta, .bak del vecchio
-        file, os.replace atomico, rollback su errore.
-        Solleva OSError se il commit fallisce.
-        """
         if is_privileged_path(self.config_path):
-            proc = run_privileged("commit", self.config_path, content=content)
+            extra_args: List[str] = []
+            seed_file = self._write_seed_tmp()
+            if seed_file:
+                extra_args.append(seed_file)
+            try:
+                proc = run_privileged("commit", self.config_path,
+                                      content=content, extra_args=extra_args)
+            finally:
+                if seed_file:
+                    try:
+                        os.remove(seed_file)
+                    except OSError:
+                        pass
             if proc.returncode != 0:
                 detail = (proc.stderr or proc.stdout or "errore sconosciuto").strip()
                 raise OSError(detail)
             return
-
-        # Percorso scrivibile -> commit locale (stessa strategia del helper)
         self._save_local(content)
+
+    def _write_seed_tmp(self) -> Optional[str]:
+        """Scrive il seed `.orig` in un file temporaneo leggibile da root."""
+        if not self.orig_seed or os.path.isfile(self.orig_path):
+            return None
+        try:
+            fd, path = tempfile.mkstemp(prefix="gamemode-orig-", suffix=".ini")
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(self.orig_seed)
+            os.chmod(path, 0o644)
+            return path
+        except OSError:
+            return None
 
     def _save_local(self, content: str) -> None:
         directory = os.path.dirname(self.config_path) or "."
@@ -527,13 +683,16 @@ class ConfigManager:
             os.fsync(fh.fileno())
         os.chmod(self.tmp_path, 0o644)
 
-        # .orig una sola volta
         if not os.path.isfile(self.orig_path):
-            source = self.config_path if os.path.isfile(self.config_path) else self.tmp_path
-            shutil.copy2(source, self.orig_path)
+            if os.path.isfile(self.config_path):
+                shutil.copy2(self.config_path, self.orig_path)
+            elif self.orig_seed:
+                with open(self.orig_path, "w", encoding="utf-8") as fh:
+                    fh.write(self.orig_seed)
+            else:
+                shutil.copy2(self.tmp_path, self.orig_path)
             os.chmod(self.orig_path, 0o644)
 
-        # backup del precedente
         had_previous = os.path.isfile(self.config_path)
         if had_previous:
             shutil.copy2(self.config_path, self.backup_path)
@@ -552,9 +711,7 @@ class ConfigManager:
             except OSError:
                 pass
 
-    # -- ripristini ----------------------------------------------------------
     def rollback_from_backup(self) -> bool:
-        """Ripristina `.bak` sul file attivo. True se riuscito."""
         try:
             if is_privileged_path(self.config_path):
                 proc = run_privileged("restore-backup", self.config_path)
@@ -568,7 +725,6 @@ class ConfigManager:
             return False
 
     def restore_from_orig(self) -> bool:
-        """Ripristina `.orig` sul file attivo. True se riuscito."""
         try:
             if is_privileged_path(self.config_path):
                 proc = run_privileged("restore-orig", self.config_path)
@@ -582,17 +738,11 @@ class ConfigManager:
             return False
 
     def ensure_orig_on_first_run(self) -> None:
-        """Crea `.orig` al primo avvio se non esiste (senza toccare l'attivo).
-
-        Normalmente non serve chiamarlo: `.orig` viene creato automaticamente
-        al primo commit. Questo metodo esiste per compatibilità/uso manuale.
-        """
         if os.path.isfile(self.orig_path):
             return
         if is_privileged_path(self.config_path):
             try:
-                run_privileged("ensure-orig", self.config_path,
-                               content=default_ini())
+                run_privileged("ensure-orig", self.config_path, content=default_ini())
             except Exception:
                 pass
         else:
@@ -608,7 +758,7 @@ class ConfigManager:
 
 
 # ===========================================================================
-# 7. UTILITY GAMEMODE (test, riavvio, gruppo)
+# 9. UTILITY GAMEMODE (test, riavvio, gruppo)
 # ===========================================================================
 
 @dataclass
@@ -685,23 +835,22 @@ def add_user_to_group() -> CommandResult:
 
 
 # ===========================================================================
-# 8. SESSIONE (persistenza delle scelte su file di stato)
+# 10. SESSIONE (persistenza dei valori su file JSON, struttura a categorie)
 # ===========================================================================
-# Le "indici delle scelte" (flag + valori) vengono mantenute in memoria durante
-# la sessione e, al commit, salvate anche in un file JSON accanto alla
-# configurazione attiva, così uno stato riapribile è disponibile anche se il
-# file attivo viene modificato fuori dalla GUI.
+# La sessione ha la stessa struttura a categorie delle definizioni:
+#     {"version": 1, "categories": {"general": {"reaper_freq": 10}, ...}}
 
 def session_path(config_path: str) -> str:
     return config_path + ".session.json"
 
 
-def save_session(config_path: str, flags: Dict[str, bool], values: Dict[str, object]) -> None:
-    """Salva lo stato delle scelte correnti su <config>.session.json."""
-    data = {
-        "flags": flags,
-        "values": {k: _json_safe(v) for k, v in values.items()},
-    }
+def save_session(config_path: str, values: Dict[str, object]) -> None:
+    """Salva i valori correnti su <config>.session.json."""
+    categories: Dict[str, Dict[str, object]] = {}
+    for spec in OPTIONS:
+        categories.setdefault(spec.section, {})[spec.key] = _json_safe(
+            values.get(spec.id, spec.default))
+    data = {"version": 1, "categories": categories}
     try:
         with open(session_path(config_path), "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
@@ -715,11 +864,27 @@ def _json_safe(value):
     return str(value)
 
 
-def load_session(config_path: str) -> Optional[tuple]:
-    """Ricarica flag+valori da session.json. Restituisce (flags, values) o None."""
+def load_session(config_path: str) -> Optional[Dict[str, object]]:
+    """Ricarica i valori (piatti, id -> valore) da session.json.
+
+    Supporta il nuovo formato a categorie e il vecchio formato
+    ``{"flags": ..., "values": ...}``.
+    """
     try:
         with open(session_path(config_path), "r", encoding="utf-8") as fh:
             data = json.load(fh)
-        return data.get("flags", {}), data.get("values", {})
     except (OSError, ValueError):
         return None
+    if not isinstance(data, dict):
+        return None
+    categories = data.get("categories")
+    if isinstance(categories, dict):
+        flat: Dict[str, object] = {}
+        for section, opts in categories.items():
+            if isinstance(opts, dict):
+                for key, value in opts.items():
+                    flat[f"{section}.{key}"] = value
+        return flat
+    if isinstance(data.get("values"), dict):
+        return data["values"]
+    return None

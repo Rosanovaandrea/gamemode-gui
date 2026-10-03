@@ -19,6 +19,16 @@
   <entry id="nav.next">Avanti</entry>
   <entry id="nav.close">Chiudi</entry>
 
+  <!-- ===== Schede ===== -->
+  <entry id="tab.general">Generale</entry>
+  <entry id="tab.filter">Filtro</entry>
+  <entry id="tab.gpu">GPU</entry>
+  <entry id="tab.cpu">CPU</entry>
+  <entry id="tab.custom">Custom</entry>
+  <entry id="tab.summary">Riepilogo</entry>
+  <entry id="tab.daemon">Daemon</entry>
+  <entry id="tab.daemon.subtitle">Riavvio del daemon, test e appartenenza al gruppo gamemode.</entry>
+
   <!-- ===== Passi (titoli e sottotitoli) ===== -->
   <entry id="step.general.title">Generale</entry>
   <entry id="step.general.subtitle">Impostazioni principali di GameMode.</entry>
@@ -26,15 +36,19 @@
   <entry id="step.filter.subtitle">Whitelist e blacklist dei programmi.</entry>
   <entry id="step.gpu.title">GPU</entry>
   <entry id="step.gpu.subtitle">Ottimizzazioni hardware (NVIDIA / AMD).</entry>
+  <entry id="step.cpu.title">CPU</entry>
+  <entry id="step.cpu.subtitle">Pinning dei core e parking dei core.</entry>
+  <entry id="step.custom.title">Script personalizzati</entry>
+  <entry id="step.custom.subtitle">Comandi eseguiti all'avvio e alla fine di GameMode.</entry>
   <entry id="step.summary.title">Riepilogo e conferma</entry>
   <entry id="step.summary.subtitle">Anteprima del file che verrà scritto.</entry>
+  <entry id="summary.path">Override gestito (scritto dalla GUI): {path}</entry>
+  <entry id="summary.base">Base installata (sola lettura): {path}</entry>
   <entry id="step.restart.title">Configurazione salvata</entry>
 
   <entry id="gpu.banner">Attenzione: le ottimizzazioni [gpu] vengono applicate dal daemon solo se il file si trova in /etc/gamemode.ini (percorso privilegiato). Usale a tuo rischio.</entry>
 
   <!-- ===== Widget opzioni ===== -->
-  <entry id="widget.include">Includi</entry>
-  <entry id="widget.include.tooltip">Includi {key} nel file di configurazione</entry>
   <entry id="list.add">Aggiungi</entry>
   <entry id="list.remove.tooltip">Rimuovi</entry>
   <entry id="list.placeholder">Nuovo valore…</entry>
@@ -44,10 +58,16 @@
 
   <!-- ===== Pulsanti riepilogo / riavvio ===== -->
   <entry id="btn.save">Salva</entry>
+  <entry id="btn.save.tooltip">Salva l'intera configurazione (il file viene riscritto per intero, default inclusi)</entry>
   <entry id="btn.restore_backup">Ripristina backup precedente</entry>
   <entry id="btn.restore_orig">Ripristina originale</entry>
   <entry id="btn.restart_daemon">Riavvia gamemoded</entry>
+  <entry id="btn.test_daemon">Esegui test del daemon</entry>
   <entry id="btn.add_group">Aggiungi al gruppo gamemode</entry>
+  <entry id="daemon.group.title">Gruppo 'gamemode'</entry>
+  <entry id="daemon.console.title">Console</entry>
+  <entry id="daemon.console.clear">Pulisci</entry>
+  <entry id="daemon.console.cmd">$ {cmd}</entry>
 
   <!-- ===== Dialoghi ===== -->
   <entry id="dlg.yes">Sì</entry>
@@ -59,7 +79,7 @@
   <entry id="dlg.confirm">Conferma</entry>
 
   <entry id="dlg.help.title">Guida rapida</entry>
-  <entry id="dlg.help.body">Gestione del file gamemode.ini con privilegi.\n\nQuesta applicazione gestisce il file di configurazione di GameMode. Le opzioni [gpu] vengono applicate dal daemon solo quando il file risiede in /etc/gamemode.ini (percorso privilegiato): quando attivi le opzioni GPU, verrà chiesto di inserire la password amministratore tramite pkexec.\n\nPer usare renice e core parking è necessario appartenere al gruppo 'gamemode'.</entry>
+  <entry id="dlg.help.body">Gestione del file gamemode.ini con privilegi.\n\nQuesta applicazione gestisce il file di configurazione di GameMode. Le opzioni [gpu] vengono applicate dal daemon solo quando il file risiede in /etc/gamemode.ini (percorso privilegiato): quando attivi le opzioni GPU, verrà chiesto di inserire la password amministratore tramite pkexec.\n\nGameMode legge più file in quest'ordine: /usr/share/gamemode/gamemode.ini (fornito dal pacchetto), /etc/gamemode.ini, ~/.config/gamemode.ini e $PWD/gamemode.ini. I valori dei file successivi sovrascrivono i precedenti. Questa GUI scrive in /etc/gamemode.ini, la posizione pensata per la configurazione dell'amministratore (e una delle due, insieme a /usr/share, in cui ha effetto la sezione [gpu]).\n\nPer usare renice e core parking è necessario appartenere al gruppo 'gamemode'.</entry>
 
   <entry id="dlg.unsaved.title">Modifiche non salvate</entry>
   <entry id="dlg.unsaved.body">Sono presenti modifiche non salvate. Uscire senza salvare?</entry>
@@ -81,22 +101,9 @@
   <entry id="dlg.restore_orig.ok">Configurazione originale ripristinata.</entry>
   <entry id="dlg.restore_orig.none">Non esiste gamemode.ini.orig.</entry>
 
-  <entry id="dlg.group.title">Aggiunta al gruppo 'gamemode'</entry>
-  <entry id="dlg.group.success">Comando completato con successo.</entry>
-  <entry id="dlg.group.failed">Il comando è fallito (consultare i dettagli).</entry>
-  <entry id="dlg.group.output">Il comando ha prodotto del testo da consultare.</entry>
-  <entry id="dlg.group.none">(nessun output)</entry>
-
   <entry id="dlg.logout.title">Logout richiesto</entry>
   <entry id="dlg.logout.body">Sei stato aggiunto al gruppo 'gamemode'. Per rendere effettivo il cambiamento è necessario eseguire il logout/login. Il riavvio del daemon da solo non basta.</entry>
 
-  <entry id="dlg.restart.title">Riavvio del daemon</entry>
-  <entry id="dlg.restart.body">Riavviare il daemon gamemoded utente?</entry>
-
-  <entry id="dlg.test.title">Test del daemon</entry>
-  <entry id="dlg.test.ok">Comando completato con successo.</entry>
-
-  <entry id="step.restart.desc">La configurazione è stata scritta correttamente. Puoi riavviare il daemon GameMode ora oppure chiudere.</entry>
   <entry id="step.restart.group_in">Sei già nel gruppo 'gamemode'.</entry>
   <entry id="step.restart.group_out">Non risulti ancora nel gruppo 'gamemode'. Dopo l'aggiunta è necessario il logout/login perché abbia effetto.</entry>
   <entry id="step.restart.group_missing">Il gruppo 'gamemode' non esiste su questo sistema.</entry>
@@ -116,17 +123,25 @@
   <entry id="opt.general.igpu_power_threshold">Soglia (rapporto W iGPU / W CPU) oltre cui si considera la GPU integrata sotto carico. -1 disabilita il controllo.</entry>
   <entry id="opt.general.softrealtime">Politica dello scheduler a tempo reale debole. "auto" l'attiva con 4 o più core, "on" sempre, "off" mai.</entry>
   <entry id="opt.general.renice">Valore di nice applicato (negato) ai processi di gioco. Richiede l'appartenenza al gruppo gamemode. 0 = nessuna modifica.</entry>
-  <entry id="opt.general.ioprio">Priorità I/O applicata ai client. Da 0 (massima) a 7, oppure "off" (disabilita) o "reset" (comportamento predefinito).</entry>
+  <entry id="opt.general.ioprio">Priorità I/O applicata ai client, scelta tramite pulsanti: da 0 (massima) a 7, oppure "off" (disabilita) o "reset" (ripristina il comportamento predefinito basato sulla priorità CPU).</entry>
   <entry id="opt.general.inhibit_screensaver">Se GameMode deve inibire lo screensaver quando attivo.</entry>
   <entry id="opt.general.disable_splitlock">Se GameMode deve disabilitare la mitigazione split lock quando attivo.</entry>
 
   <entry id="opt.filter.whitelist">Se presente, GameMode accetta solo i programmi elencati (il cui nome contiene l'occorrenza).</entry>
   <entry id="opt.filter.blacklist">GameMode rifiuta sempre i programmi elencati.</entry>
 
+  <entry id="opt.gpu.enable_power_plan.label">Abilita modifica power plan GPU</entry>
   <entry id="opt.gpu.apply_gpu_optimisations">Imposta la chiave "accept-responsibility" per permettere overclock e ottimizzazioni GPU. Richiede il file in /etc/gamemode.ini.</entry>
   <entry id="opt.gpu.gpu_device">Numero del dispositivo DRM (di solito 0), cioè il numero in /sys/class/drm/card0/.</entry>
-  <entry id="opt.gpu.nv_powermizer_mode">GPU PowerMizer Mode NVIDIA. "Adaptive"=0, "Prefer Maximum Performance"=1, "Auto"=2. Richiede l'estensione coolbits.</entry>
+  <entry id="opt.gpu.nv_powermizer_mode">GPU PowerMizer Mode NVIDIA. "Adaptive"=0, "Prefer Maximum Performance"=1, "Auto"=2. Lasciare "— (predefinito)" per non modificare. Richiede l'estensione coolbits.</entry>
   <entry id="opt.gpu.nv_core_clock_mhz_offset">Offset in MHz della frequenza GPU (core). 0 ripristina i valori predefiniti, -1 o assente non modifica nulla.</entry>
   <entry id="opt.gpu.nv_mem_clock_mhz_offset">Offset in MHz della frequenza memoria (GPU). 0 ripristina i valori predefiniti, -1 o assente non modifica nulla.</entry>
-  <entry id="opt.gpu.amd_performance_level">Corrisponde a power_dpm_force_performance_level. "manual" non è supportato al momento.</entry>
+  <entry id="opt.gpu.amd_performance_level">Corrisponde a power_dpm_force_performance_level. Lasciare "— (predefinito)" per non modificare. "manual" non è supportato al momento.</entry>
+
+  <entry id="opt.cpu.pin_cores">Blocca (pin) il gioco su un insieme specifico di core. Seleziona i core con le caselle; se non ne selezioni nessuno, GameMode rileva automaticamente i core migliori (P-core/E-core).</entry>
+  <entry id="opt.cpu.park_cores">Mette offline (park) i core non usati dal gioco. Richiede l'appartenenza al gruppo 'gamemode'.</entry>
+
+  <entry id="opt.custom.start">Elenco di comandi/script eseguiti (tramite /bin/sh) all'avvio di GameMode. Una riga = un comando.</entry>
+  <entry id="opt.custom.end">Elenco di comandi/script eseguiti (tramite /bin/sh) alla fine di GameMode. Una riga = un comando.</entry>
+  <entry id="opt.custom.script_timeout">Tempo massimo (in secondi) concesso agli script: se non terminano entro questo tempo vengono interrotti.</entry>
 </translations>

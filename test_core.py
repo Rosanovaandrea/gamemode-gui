@@ -9,8 +9,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import core
 from core import (
-    ActivationManager, ConfigManager, OPTIONS, OptionSpec,
-    default_ini, parse_ini, render_ini, tr,
+    ConfigManager, OPTIONS, OptionSpec,
+    default_ini, default_values, parse_ini, render_ini, tr,
+    values_from_parsed,
 )
 from core import save_session, load_session
 
@@ -18,32 +19,146 @@ print("== Opzioni in tabella:", len(OPTIONS))
 assert "general" in core.SECTIONS_ORDER
 
 # ---------------------------------------------------------------------------
-# 1. Renderer: roundtrip tabella -> file -> tabella
+# 0. Definizioni caricate da options.json (data-driven)
 # ---------------------------------------------------------------------------
-d = default_ini()
-print("== default_ini:\n", d)
+assert [c.id for c in core.CATEGORIES] == ["general", "filter", "gpu", "cpu", "custom"]
+assert len(OPTIONS) == 25
+for spec in OPTIONS:
+    assert spec.description_id and spec.type and spec.widget, spec.id
+    assert core.OPTIONS_BY_ID[spec.id] is spec
+
+# Valori "speciali" letti dal sistema (governor CPU).
+gov_spec = core.OPTIONS_BY_ID["general.desiredgov"]
+assert gov_spec.special and gov_spec.special_source == "cpu_governors"
+govs = core.get_cpu_governors()
+assert govs, "lista governor vuota"
+assert core.resolve_choices(gov_spec) == govs
+# Valori normali: scelte statiche dal JSON.
+assert core.resolve_choices(core.OPTIONS_BY_ID["general.softrealtime"]) == ["auto", "on", "off"]
+
+# ioprio: scelta a pulsanti con valori speciali "off" e "reset".
+ioprio = core.OPTIONS_BY_ID["general.ioprio"]
+ioprio_choices = core.resolve_choices(ioprio)
+assert ioprio.type == "choice" and ioprio.widget == "radio"
+assert "off" in ioprio_choices and "reset" in ioprio_choices
+
+# CPU: pinning speciale (core dal sistema) + parking bool.
+pin = core.OPTIONS_BY_ID["cpu.pin_cores"]
+assert pin.type == "cores" and pin.special and pin.special_source == "cpu_cores"
+cores = core.get_cpu_cores()
+assert cores and all(c.isdigit() for c in cores)
+assert core.resolve_choices(pin) == cores
+assert core.OPTIONS_BY_ID["cpu.park_cores"].type == "bool"
+
+# Custom: start/end liste + timeout int.
+assert core.OPTIONS_BY_ID["custom.start"].type == "list"
+assert core.OPTIONS_BY_ID["custom.end"].type == "list"
+assert core.OPTIONS_BY_ID["custom.script_timeout"].default == 10
+print("== options.json caricato OK (governor:", ", ".join(govs), "| core:", ",".join(cores), ")")
+
+# ---------------------------------------------------------------------------
+# 1. Renderer: solo opzioni attive (default NON scritti) + roundtrip
+# ---------------------------------------------------------------------------
+# Un file con tutti i default equivale a nessuna chiave.
+assert default_ini() == ""
+print("== default_ini() vuoto (nessun default scritto)")
+
+values = default_values()
+values["general.reaper_freq"] = 10
+values["general.inhibit_screensaver"] = False
+d = render_ini(values)
+print("== render (solo attive):\n", d)
+assert "reaper_freq=10" in d
+assert "inhibit_screensaver=0" in d
+# I default non toccati non compaiono.
+assert "renice" not in d
+assert "disable_splitlock" not in d
 parsed = parse_ini(d)
-am = ActivationManager()
-values = am.rebuild_from_parsed(parsed)
-flags = {spec.id: am.get_flag(spec.id) for spec in OPTIONS}
-rendered = render_ini(flags, values)
+values_round = values_from_parsed(parsed)
+rendered = render_ini(values_round)
 assert rendered == d, "roundtrip mismatch"
 print("== roundtrip OK")
 
 # ---------------------------------------------------------------------------
-# 2. Liste (whitelist/blacklist) come chiavi ripetute
+# 2. [gpu]: le opt dipendenti esistono solo con apply_gpu_optimisations attivo
 # ---------------------------------------------------------------------------
-flags2 = {spec.id: False for spec in OPTIONS}
-values2 = {spec.id: spec.default for spec in OPTIONS}
-flags2["filter.whitelist"] = True
+gpu_values = default_values()
+gpu_values["gpu.gpu_device"] = 1          # dipende dall'interruttore, spento
+gpu_values["gpu.nv_core_clock_mhz_offset"] = 150
+gpu_off = render_ini(gpu_values)
+assert gpu_off == "", f"gpu scritte senza interruttore: {gpu_off!r}"
+
+gpu_values["gpu.apply_gpu_optimisations"] = "accept-responsibility"
+gpu_on = render_ini(gpu_values)
+assert "apply_gpu_optimisations=accept-responsibility" in gpu_on
+assert "gpu_device=1" in gpu_on
+assert "nv_core_clock_mhz_offset=150" in gpu_on
+print("== dipendenza [gpu] OK")
+
+# ---------------------------------------------------------------------------
+# 3b. CPU (pinning cores + parking) e script custom (liste ripetute)
+# ---------------------------------------------------------------------------
+cv = default_values()
+cv["cpu.pin_cores"] = [0, 2, 4]
+cv["cpu.park_cores"] = True
+r_cpu = render_ini(cv)
+assert "pin_cores=0,2,4" in r_cpu
+assert "park_cores=1" in r_cpu
+pv = values_from_parsed(parse_ini(r_cpu))
+assert pv["cpu.pin_cores"] == [0, 2, 4]
+assert pv["cpu.park_cores"] is True
+
+cv2 = default_values()
+cv2["custom.start"] = ["notify-send hi", "echo bye"]
+cv2["custom.end"] = ["cleanup.sh"]
+cv2["custom.script_timeout"] = 20
+r_custom = render_ini(cv2)
+assert "start=notify-send hi" in r_custom and "start=echo bye" in r_custom
+assert "end=cleanup.sh" in r_custom
+assert "script_timeout=20" in r_custom
+p_custom = parse_ini(r_custom)
+assert p_custom["custom"]["start"] == ["notify-send hi", "echo bye"]
+print("== cpu pinning/parking + custom scripts OK")
+
+# ---------------------------------------------------------------------------
+# 3c. Base installata + override /etc (merge come il daemon) + commenti
+# ---------------------------------------------------------------------------
+with tempfile.TemporaryDirectory() as td:
+    base = os.path.join(td, "usr-share", "gamemode", "gamemode.ini")
+    over = os.path.join(td, "etc", "gamemode.ini")
+    os.makedirs(os.path.dirname(base))
+    os.makedirs(os.path.dirname(over))
+    with open(base, "w", encoding="utf-8") as fh:
+        fh.write("[general]\n; commento base\nreaper_freq=3\n[filter]\nwhitelist=base1\n")
+    with open(over, "w", encoding="utf-8") as fh:
+        fh.write("[general]\nreaper_freq=7\n[filter]\nwhitelist=over1\n")
+
+    merged = core.load_effective_values(base, over)
+    assert merged["general.reaper_freq"] == 7                 # override vince
+    assert merged["filter.whitelist"] == ["base1", "over1"]   # liste accodate
+
+    comments = core.load_base_comments(base)
+    assert comments["general.reaper_freq"].startswith(";")
+    r = core.render_ini(merged, comments)
+    assert "reaper_freq=7" in r and "; commento base" in r
+
+    os.environ["GAMEMODE_BASE"] = base
+    assert core.resolve_base_path() == base
+    del os.environ["GAMEMODE_BASE"]
+print("== base installata + override + commenti OK")
+
+# ---------------------------------------------------------------------------
+# 3. Liste (whitelist/blacklist) come chiavi ripetute
+# ---------------------------------------------------------------------------
+values2 = default_values()
 values2["filter.whitelist"] = ["RiseOfTheTombRaider", "glxgears"]
-cfg = render_ini(flags2, values2)
+cfg = render_ini(values2)
 p2 = parse_ini(cfg)
 assert p2["filter"]["whitelist"] == ["RiseOfTheTombRaider", "glxgears"]
 print("== liste ripetute OK")
 
 # ---------------------------------------------------------------------------
-# 3. ConfigManager: commit locale atomico + .orig + .bak + rollback
+# 4. ConfigManager: commit locale atomico + .orig + .bak + rollback
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
@@ -67,7 +182,7 @@ with tempfile.TemporaryDirectory() as td:
     print("== commit locale + .orig + .bak + rollback OK")
 
 # ---------------------------------------------------------------------------
-# 4. i18n via XML (it) — configurabile, non hardcoded
+# 5. i18n via XML (it) — configurabile, non hardcoded
 # ---------------------------------------------------------------------------
 assert tr("window.title") == "GameMode GUI"
 assert tr("btn.save") == "Salva"
@@ -75,23 +190,20 @@ assert tr("chiave.inesistente") == "chiave.inesistente"  # fallback sul key
 print("== i18n OK")
 
 # ---------------------------------------------------------------------------
-# 5. Sessione (persistenza delle scelte su file JSON)
+# 6. Sessione (persistenza dei valori su file JSON)
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
-    flags_s = {"general.reaper_freq": True, "general.desiredgov": True}
     values_s = {"general.reaper_freq": 7, "general.desiredgov": "powersave"}
-    save_session(path, flags_s, values_s)
+    save_session(path, values_s)
     restored = load_session(path)
     assert restored is not None
-    f2, v2 = restored
-    assert f2["general.reaper_freq"] is True
-    assert v2["general.reaper_freq"] == 7
-    assert v2["general.desiredgov"] == "powersave"
+    assert restored["general.reaper_freq"] == 7
+    assert restored["general.desiredgov"] == "powersave"
 print("== sessione OK")
 
 # ---------------------------------------------------------------------------
-# 6. Privileged helper (simulazione locale, senza root)
+# 7. Privileged helper (simulazione locale, senza root)
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
@@ -104,5 +216,16 @@ with tempfile.TemporaryDirectory() as td:
     assert open(path).read() == cfg
     assert os.path.isfile(path + ".orig")
     print("== privileged.py commit OK")
+
+    # Seed del .orig dal file installato (commit con seed path)
+    path2 = os.path.join(td, "gamemode2.ini")
+    seed = os.path.join(td, "seed.ini")
+    with open(seed, "w", encoding="utf-8") as fh:
+        fh.write("; seed installato\n")
+    proc = subprocess.run([sys.executable, helper, "commit", path2, seed],
+                          input=cfg, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert open(path2 + ".orig").read() == "; seed installato\n"
+    print("== privileged.py seed .orig OK")
 
 print("\nALL CORE TESTS PASSED")

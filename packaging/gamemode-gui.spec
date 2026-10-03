@@ -1,0 +1,76 @@
+Name:           gamemode-gui
+Version:        1.0.0
+Release:        1%{?dist}
+Summary:        GUI for configuring Feral GameMode
+
+License:        MIT
+URL:            https://github.com/gamemode-gui/gamemode-gui
+Source0:        %{name}-%{version}.tar.gz
+BuildArch:      noarch
+
+Requires:       python3
+Requires:       python3-gobject
+Requires:       gtk4
+Requires:       libadwaita
+Requires:       gamemode
+Requires:       polkit
+Recommends:     sudo
+
+%description
+A GTK4 + Libadwaita desktop application to manage the Feral GameMode
+configuration file (gamemode.ini) in a visual, safe and atomic way.
+It writes the administrator override in /etc/gamemode.ini, reading the
+package-installed file as the base, and manages custom scripts, CPU core
+pinning/parking and GPU optimisations.
+
+%prep
+%setup -q
+
+%build
+# Nessuna compilazione: pacchetto Python/GTK puro.
+
+%install
+rm -rf %{buildroot}
+install -d %{buildroot}%{_datadir}/%{name}
+install -m 644 core.py ui.py widgets.py privileged.py options.json %{buildroot}%{_datadir}/%{name}/
+install -m 755 main.py %{buildroot}%{_datadir}/%{name}/main.py
+install -d %{buildroot}%{_datadir}/%{name}/locale
+install -m 644 locale/it.xml %{buildroot}%{_datadir}/%{name}/locale/it.xml
+
+install -d %{buildroot}%{_bindir}
+install -m 755 packaging/gamemode-gui %{buildroot}%{_bindir}/gamemode-gui
+
+install -d %{buildroot}%{_datadir}/applications
+install -m 644 packaging/io.github.gamemodegui.GameModeGui.desktop \
+    %{buildroot}%{_datadir}/applications/io.github.gamemodegui.GameModeGui.desktop
+
+install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
+install -m 644 packaging/io.github.gamemodegui.GameModeGui.svg \
+    %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
+
+install -d %{buildroot}%{_datadir}/licenses/%{name}
+install -m 644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+
+%post
+if [ -x %{_bindir}/update-desktop-database ]; then
+    %{_bindir}/update-desktop-database -q %{_datadir}/applications || :
+fi
+if [ -x %{_bindir}/gtk-update-icon-cache ]; then
+    %{_bindir}/gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor || :
+fi
+
+%postun
+if [ -x %{_bindir}/update-desktop-database ]; then
+    %{_bindir}/update-desktop-database -q %{_datadir}/applications || :
+fi
+
+%files
+%{_datadir}/%{name}
+%{_bindir}/gamemode-gui
+%{_datadir}/applications/io.github.gamemodegui.GameModeGui.desktop
+%{_datadir}/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
+%{_datadir}/licenses/%{name}/LICENSE
+
+%changelog
+* Thu Oct 01 2026 GameMode GUI contributors - 1.0.0-1
+- Initial package

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=GameMode GUI
+Name[it]=GameMode GUI
+Comment=Configure Feral GameMode
+Comment[it]=Configura Feral GameMode
+GenericName=GameMode configuration
+Exec=gamemode-gui
+Icon=io.github.gamemodegui.GameModeGui
+Terminal=false
+Categories=Settings;
+Keywords=game;performance;gamemode;configuration;
+StartupNotify=true
+StartupWMClass=io.github.gamemodegui.GameModeGui
