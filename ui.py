@@ -27,7 +27,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gio, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 import core
 from core import Category, ConfigManager, OptionSpec, tr
@@ -90,27 +90,25 @@ def missing_dialog(parent, heading: str, body: str) -> Adw.MessageDialog:
     return info_dialog(parent, heading, body, close=tr("dlg.close"))
 
 
-# Stile della "console simulata" della scheda Daemon (aspetto da terminale).
-_CONSOLE_CSS = b"""
-.console, .console text {
-  background-color: #16181d;
-  color: #e6e6e6;
-  font-family: monospace;
-}
-"""
+# Stile dell'applicazione: caricato dal file `style.css` accanto al codice
+# (console della scheda Daemon, scelta selezionata a sfondo d'accento, testi
+# "+"/"−" degli stepper nel colore d'accento).
+_STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.css")
 
 
-def install_console_css() -> None:
-    """Registra lo stile della console (best effort, mai fatale)."""
+def install_app_css() -> bool:
+    """Registra lo stile dell'app da `style.css`. Ritorna True se aggiunto."""
     try:
         provider = Gtk.CssProvider()
-        provider.load_from_data(_CONSOLE_CSS)
-        display = Gtk.Widget.get_default_display()
-        if display is not None:
-            Gtk.StyleContext.add_provider_for_display(
-                display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        provider.load_from_path(_STYLE_FILE)
+        display = Gdk.Display.get_default()
+        if display is None:
+            return False
+        Gtk.StyleContext.add_provider_for_display(
+            display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        return True
     except Exception:
-        pass
+        return False
 
 
 # ===========================================================================
@@ -141,7 +139,7 @@ class SessionController:
             if restored is not None:
                 for spec in core.OPTIONS:
                     if spec.id in restored:
-                        self.values[spec.id] = _coerce_value(spec, restored[spec.id])
+                        self.values[spec.id] = core.coerce_value(spec, restored[spec.id])
 
     def set_option(self, spec_id: str, value) -> None:
         self.values[spec_id] = value
@@ -153,24 +151,6 @@ class SessionController:
 
     def render(self) -> str:
         return core.render_ini(self.values, self.base_comments)
-
-
-def _coerce_value(spec: OptionSpec, raw):
-    """Converte un valore caricato da sessione JSON al tipo della spec."""
-    try:
-        if spec.type == "int":
-            return int(raw)
-        if spec.type == "float":
-            return float(raw)
-        if spec.type == "bool":
-            return bool(raw)
-        if spec.type == "list":
-            return list(raw) if isinstance(raw, list) else [str(raw)]
-        if spec.type == "choice" and spec.choices and raw not in spec.choices:
-            return spec.default
-        return raw
-    except (TypeError, ValueError):
-        return spec.default
 
 
 # ===========================================================================
@@ -191,6 +171,9 @@ class OptionTab(Gtk.Box):
         self.rows: List[OptionRow] = []
 
         self.append(_header(tr(category.title_id), tr(category.subtitle_id)))
+        toggle_specs = [s for s in category.options if s.type == "toggle_entry"]
+        if toggle_specs:
+            self.append(_build_toggle_card(category, toggle_specs, controller, self.rows))
         self.append(_build_option_list(controller, category, self.rows))
         self.append(self._save_bar())
         if category.banner_id:
@@ -393,6 +376,8 @@ def _build_option_list(controller: SessionController, category: Category,
     listbox.add_css_class("boxed-list")
 
     for spec in category.options:
+        if spec.type == "toggle_entry":
+            continue  # questi finiscono nella card in cima (vedi _build_toggle_card)
         row = OptionRow(spec)
         _populate_row(row, controller)
         row._on_change = lambda spec_id, _r=row: _apply_row_change(
@@ -402,6 +387,40 @@ def _build_option_list(controller: SessionController, category: Category,
 
     scroller.set_child(listbox)
     return scroller
+
+
+def _build_toggle_card(category: Category, specs: List[OptionSpec],
+                       controller: SessionController,
+                       rows: List[OptionRow]) -> Gtk.Widget:
+    """Card in cima alla scheda con gli interruttori "toggle_entry".
+
+    Ogni interruttore aggiunge/rimuove una stringa fissa (``entry``) dalla lista
+    bersaglio (``target``): la lista stessa mostra solo gli altri script.
+    """
+    card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    card.add_css_class("card")
+    card.set_margin_top(4)
+    card.set_margin_bottom(4)
+    card.set_margin_start(4)
+    card.set_margin_end(4)
+    if category.toggle_card_id:
+        title = Gtk.Label(label=tr(category.toggle_card_id), xalign=0.0,
+                          css_classes=["heading"])
+        title.set_margin_start(12)
+        title.set_margin_top(8)
+        title.set_margin_bottom(4)
+        card.append(title)
+
+    listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+    for spec in specs:
+        row = OptionRow(spec)
+        _populate_row(row, controller)
+        row._on_change = lambda spec_id, _r=row: _apply_row_change(
+            controller, _r, spec_id)
+        rows.append(row)
+        listbox.append(row)
+    card.append(listbox)
+    return card
 
 
 def _populate_row(row: OptionRow, controller: SessionController) -> None:
@@ -439,6 +458,12 @@ class GameModeWindow(Adw.ApplicationWindow):
 
         self._init_data()
         self._build_ui()
+        self._warn_lang_config()
+
+    def _warn_lang_config(self) -> None:
+        """Avvisa (non bloccante) se la configurazione delle lingue ha errori."""
+        for message in core.describe_lang_errors():
+            self._show_toast(message)
 
     @staticmethod
     def _read_text(path: Optional[str]) -> str:
@@ -456,7 +481,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     # -- costruzione UI ---------------------------------------------------------
     def _build_ui(self) -> None:
         self.set_title(tr("window.title"))
-        install_console_css()
+        install_app_css()
 
         toolbar = Adw.ToolbarView()
         self.toast_overlay = Adw.ToastOverlay()
@@ -470,6 +495,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         help_btn.set_tooltip_text(tr("header.help.tooltip"))
         help_btn.connect("clicked", lambda *_: self._show_help())
         header.pack_end(help_btn)
+        header.pack_end(self._build_lang_button())
 
         # Stack delle schede.
         self.stack = Adw.ViewStack()
@@ -509,6 +535,30 @@ class GameModeWindow(Adw.ApplicationWindow):
         wrapper.append(self.stack)
         toolbar.set_content(wrapper)
         self.connect("close-request", self._on_close_request)
+
+    def _build_lang_button(self) -> Gtk.Widget:
+        """Pulsante nell'header con il menu delle lingue disponibili.
+
+        La voce selezionata è quella attiva; sceglierne un'altra la salva
+        (azione `app.set-lang`) in attesa del prossimo avvio.
+        """
+        button = Gtk.MenuButton()
+        button.set_icon_name("preferences-desktop-locale-symbolic")
+        button.set_tooltip_text(tr("header.lang.tooltip"))
+        menu = Gio.Menu()
+        # Lingue e nomi vengono dal file di configurazione / dagli XML.
+        for code, label in core.available_langs():
+            item = Gio.MenuItem.new(label, None)
+            item.set_action_and_target_value("app.set-lang",
+                                             GLib.Variant.new_string(code))
+            menu.append_item(item)
+        button.set_menu_model(menu)
+        return button
+
+    def notify_language_restart(self) -> None:
+        """Avvisa che la nuova lingua sarà applicata al prossimo avvio."""
+        self._run_dialog(info_dialog(self, tr("dlg.lang.title"),
+                                     tr("dlg.lang.body")))
 
     # -- dirty tracking -------------------------------------------------------------
     def _mark_dirty(self) -> None:
@@ -651,8 +701,27 @@ class GameModeApplication(Adw.Application):
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self._window: Optional[GameModeWindow] = None
+        self._install_actions()
+
+    def _install_actions(self) -> None:
+        """Azione con stato per la scelta della lingua (voci a radio)."""
+        action = Gio.SimpleAction.new_stateful(
+            "set-lang", GLib.VariantType.new("s"),
+            GLib.Variant.new_string(core.current_lang()))
+        action.connect("change-state", self._on_set_lang)
+        self.add_action(action)
+
+    def _on_set_lang(self, action: Gio.SimpleAction, value: GLib.Variant) -> None:
+        code = value.get_string()
+        if code == action.get_state().get_string():
+            return
+        action.set_state(value)
+        core.save_lang(code)  # la scelta salvata ha la precedenza su tutto
+        if self._window is not None:
+            self._window.notify_language_restart()
 
     def do_activate(self) -> None:
+        core.ensure_settings()  # crea/aggiorna settings.json (elenco lingue)
         if self._window is None:
             self._window = GameModeWindow(application=self)
         self._window.present()

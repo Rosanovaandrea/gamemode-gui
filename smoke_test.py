@@ -26,7 +26,7 @@ os.makedirs(os.environ["XDG_CONFIG_HOME"], exist_ok=True)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ui import GameModeWindow, resolve_config_path  # noqa: E402
+from ui import GameModeWindow, resolve_config_path, install_app_css  # noqa: E402
 
 results = []
 
@@ -37,12 +37,16 @@ def exercise(*_):
     win.present()
 
     results.append(("window_created", True))
+    results.append(("app_css_registered", install_app_css()))
     results.append(("config_path", resolve_config_path()))
     results.append(("tabs_count", win.stack.get_pages().get_n_items()))
     results.append(("default_tab", win.stack.get_visible_child_name()))
 
     # modifica un'opzione nella scheda Generale (nessun "Includi" da attivare)
     first = win.general_tab.rows[0]
+    results.append(("stepper_button_styled",
+                    "stepper-button" in first._input.minus.get_css_classes()
+                    and "stepper-button" in first._input.plus.get_css_classes()))
     first.set_value(10)
     results.append(("controller_value", win.controller.get_value(first.spec.id)))
     results.append(("render_has_reaper", "reaper_freq=10" in win.controller.render()))
@@ -77,6 +81,9 @@ def exercise(*_):
     ioprio_row = next(r for r in win.general_tab.rows if r.spec.key == "ioprio")
     ioprio_labels = [b.get_label() for b in ioprio_row._input._buttons]
     results.append(("ioprio_buttons", "off" in ioprio_labels and "reset" in ioprio_labels))
+    results.append(("choice_button_styled",
+                    all("choice-button" in b.get_css_classes()
+                        for b in ioprio_row._input._buttons)))
     ioprio_row.set_value("reset")
     results.append(("ioprio_reset_value", win.controller.get_value("general.ioprio")))
     results.append(("render_ioprio_reset", "ioprio=reset" in win.controller.render()))
@@ -97,6 +104,23 @@ def exercise(*_):
     start_row.set_value(["echo start"])
     results.append(("custom_start_value", win.controller.get_value("custom.start")))
 
+    # --- Custom: toggle notifiche (card in cima) ---------------------------
+    notify_start = next(r for r in win.custom_tab.rows
+                        if r.spec.key == "notify_start")
+    notify_end = next(r for r in win.custom_tab.rows if r.spec.key == "notify_end")
+    results.append(("custom_notify_default_off",
+                    win.controller.get_value("custom.notify_start") is False))
+    notify_start.set_value(True)
+    notify_end.set_value(True)
+    results.append(("custom_notify_on",
+                    win.controller.get_value("custom.notify_start") is True
+                    and win.controller.get_value("custom.notify_end") is True))
+    results.append(("render_notify_start",
+                    'start=notify-send "GameMode started"' in win.controller.render()))
+    # La notifica non compare tra gli elementi editabili della lista.
+    results.append(("custom_start_excludes_notify",
+                    'notify-send' not in " ".join(start_row.get_value())))
+
     win.do_save()
     with open(win.config_path) as fh:
         content = fh.read()
@@ -106,6 +130,8 @@ def exercise(*_):
     results.append(("file_pin_cores", "pin_cores=0,1" in content))
     results.append(("file_park_cores", "park_cores=1" in content))
     results.append(("file_custom_start", "start=echo start" in content))
+    results.append(("file_notify_start", 'start=notify-send "GameMode started"' in content))
+    results.append(("file_notify_end", 'end=notify-send "GameMode ended"' in content))
 
     # Navigazione a schede: si puo' andare su qualunque scheda.
     win.stack.set_visible_child_name("daemon")

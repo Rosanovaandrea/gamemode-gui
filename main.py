@@ -10,7 +10,9 @@ L'applicazione è divisa in pochi file, come richiesto nel refactoring:
     ui.py          → tutta l'interfaccia GTK (schede generate dai dati)
     widgets.py     → widget riutilizzabili (build_widget + componenti)
     privileged.py  → helper eseguito come root per scrivere in /etc
-    locale/<lang>.xml → traduzioni (oggi solo italiano, configurabile)
+    fileops.py     → scrittura atomica/backup/rollback (GUI + root)
+    style.css      → stile dell'app (CSS caricato a runtime)
+    locale/<lang>.xml → traduzioni (italiano e inglese)
 
 Lanciare con:  python3 main.py
 Per i test forzare un percorso scrivibile:

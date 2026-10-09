@@ -2,17 +2,19 @@
 <!--
   File di lingua per la GameMode GUI.
 
-  Aggiungere una nuova lingua: copiare questo file in locale/<codice>.xml
-  e tradurre le voci. La lingua viene selezionata automaticamente dal sistema
-  oppure forzata con la variabile d'ambiente GAMEMODE_LANG.
+  Aggiungere una nuova lingua: copiare questo file in locale/<codice>.xml,
+  tradurre le voci e aggiungere il codice a SUPPORTED_LANGS in core.py. La
+  lingua attiva si sceglie in quest'ordine: scelta salvata dall'utente, locale
+  di sistema (it/en, altrimenti inglese).
 -->
-<translations lang="it">
+<translations lang="it" name="Italiano">
   <!-- ===== Finestra / header ===== -->
   <entry id="window.title">GameMode GUI</entry>
   <entry id="header.cancel">Annulla</entry>
   <entry id="header.test">Test</entry>
   <entry id="header.test.tooltip">Esegui i test del daemon e della versione</entry>
   <entry id="header.help.tooltip">Aiuto</entry>
+  <entry id="header.lang.tooltip">Lingua</entry>
 
   <!-- ===== Navigazione ===== -->
   <entry id="nav.back">Indietro</entry>
@@ -21,7 +23,6 @@
 
   <!-- ===== Schede ===== -->
   <entry id="tab.general">Generale</entry>
-  <entry id="tab.filter">Filtro</entry>
   <entry id="tab.gpu">GPU</entry>
   <entry id="tab.cpu">CPU</entry>
   <entry id="tab.custom">Custom</entry>
@@ -32,8 +33,6 @@
   <!-- ===== Passi (titoli e sottotitoli) ===== -->
   <entry id="step.general.title">Generale</entry>
   <entry id="step.general.subtitle">Impostazioni principali di GameMode.</entry>
-  <entry id="step.filter.title">Filtro</entry>
-  <entry id="step.filter.subtitle">Whitelist e blacklist dei programmi.</entry>
   <entry id="step.gpu.title">GPU</entry>
   <entry id="step.gpu.subtitle">Ottimizzazioni hardware (NVIDIA / AMD).</entry>
   <entry id="step.cpu.title">CPU</entry>
@@ -104,6 +103,9 @@
   <entry id="dlg.logout.title">Logout richiesto</entry>
   <entry id="dlg.logout.body">Sei stato aggiunto al gruppo 'gamemode'. Per rendere effettivo il cambiamento è necessario eseguire il logout/login. Il riavvio del daemon da solo non basta.</entry>
 
+  <entry id="dlg.lang.title">Lingua salvata</entry>
+  <entry id="dlg.lang.body">La lingua verrà applicata al prossimo avvio dell'applicazione.</entry>
+
   <entry id="step.restart.group_in">Sei già nel gruppo 'gamemode'.</entry>
   <entry id="step.restart.group_out">Non risulti ancora nel gruppo 'gamemode'. Dopo l'aggiunta è necessario il logout/login perché abbia effetto.</entry>
   <entry id="step.restart.group_missing">Il gruppo 'gamemode' non esiste su questo sistema.</entry>
@@ -113,35 +115,45 @@
   <entry id="msg.timeout">Timeout dopo {timeout}s</entry>
   <entry id="msg.no_priv_frontend">Nessun frontend privilegiato disponibile</entry>
 
-  <!-- ===== Descrizioni opzioni ===== -->
-  <entry id="opt.general.reaper_freq">Frequenza del thread reaper in secondi (controlla l'uscita dei client, le modifiche al file e il bilanciamento CPU/iGPU).</entry>
-  <entry id="opt.general.desiredgov">Governor desiderato usato all'ingresso in GameMode.</entry>
-  <entry id="opt.general.defaultgov">Governor ripristinato all'uscita da GameMode invece del valore originale. Se non impostato, viene ripristinato il precedente.</entry>
-  <entry id="opt.general.desiredprof">Profilo di piattaforma desiderato all'ingresso in GameMode.</entry>
-  <entry id="opt.general.defaultprof">Profilo di piattaforma ripristinato all'uscita da GameMode. Se non impostato, viene ripristinato il precedente.</entry>
-  <entry id="opt.general.igpu_desiredgov">Governor usato per la GPU integrata quando è sotto carico elevato.</entry>
-  <entry id="opt.general.igpu_power_threshold">Soglia (rapporto W iGPU / W CPU) oltre cui si considera la GPU integrata sotto carico. -1 disabilita il controllo.</entry>
-  <entry id="opt.general.softrealtime">Politica dello scheduler a tempo reale debole. "auto" l'attiva con 4 o più core, "on" sempre, "off" mai.</entry>
-  <entry id="opt.general.renice">Valore di nice applicato (negato) ai processi di gioco. Richiede l'appartenenza al gruppo gamemode. 0 = nessuna modifica.</entry>
-  <entry id="opt.general.ioprio">Priorità I/O applicata ai client, scelta tramite pulsanti: da 0 (massima) a 7, oppure "off" (disabilita) o "reset" (ripristina il comportamento predefinito basato sulla priorità CPU).</entry>
-  <entry id="opt.general.inhibit_screensaver">Se GameMode deve inibire lo screensaver quando attivo.</entry>
-  <entry id="opt.general.disable_splitlock">Se GameMode deve disabilitare la mitigazione split lock quando attivo.</entry>
+  <!-- ===== Errori configurazione lingue ===== -->
+  <entry id="msg.lang.missing_file">Lingua '{lang}' ignorata: manca il file locale/{lang}.xml.</entry>
+  <entry id="msg.lang.bad_entry">Voce lingua non valida ignorata: {value}.</entry>
+  <entry id="msg.lang.bad_list">Chiave 'supported_langs' non valida (attesa una lista): uso le lingue predefinite.</entry>
+  <entry id="msg.lang.bad_config">Impossibile leggere settings.json: uso le lingue predefinite.</entry>
+  <entry id="msg.lang.empty">Nessuna lingua valida trovata: uso l'inglese.</entry>
 
-  <entry id="opt.filter.whitelist">Se presente, GameMode accetta solo i programmi elencati (il cui nome contiene l'occorrenza).</entry>
-  <entry id="opt.filter.blacklist">GameMode rifiuta sempre i programmi elencati.</entry>
+  <!-- ===== Descrizioni opzioni ===== -->
+  <entry id="opt.general.reaper_freq">Ogni quanti secondi il thread "reaper" di GameMode controlla client terminati, modifiche al file di configurazione e bilanciamento CPU/iGPU. Valori bassi reagiscono prima ma usano un po' più di CPU; valori alti sono più leggeri ma meno reattivi. Default: 5.</entry>
+  <entry id="opt.general.desiredgov">Governor CPU impostato all'ingresso in GameMode. "performance" tiene i core alla massima frequenza (meno stutter e latenza); "powersave"/"schedutil" consumano meno. Richiede i privilegi per scrivere il governor (pkexec).</entry>
+  <entry id="opt.general.defaultgov">Governor CPU impostato all'uscita da GameMode, al posto di quello attivo prima. Se lasciato vuoto, GameMode ripristina il governor precedente. Impostarlo (es. "powersave") evita di restare bloccati su "performance".</entry>
+  <entry id="opt.general.desiredprof">Profilo di piattaforma (ACPI/firmware) impostato all'ingresso: "performance" privilegia le prestazioni, "low-power" i consumi, "balanced" l'equilibrio. Incide su ventole, limiti termici e potenza. Non tutti i sistemi lo supportano.</entry>
+  <entry id="opt.general.defaultprof">Profilo di piattaforma ripristinato all'uscita da GameMode. Se lasciato vuoto, viene ripristinato quello precedente.</entry>
+  <entry id="opt.general.igpu_desiredgov">Governor CPU applicato quando la GPU integrata è sotto carico elevato (GameMode lo imposta come il governor CPU). "powersave" dà priorità alla GPU quando è lei a lavorare. I valori disponibili sono letti dal kernel.</entry>
+  <entry id="opt.general.igpu_power_threshold">Rapporto tra la potenza (W) della iGPU e quella della CPU oltre il quale la GPU integrata è considerata "sotto carico" (tipico 0.3–0.5). -1 disattiva del tutto il controllo iGPU (si usa sempre desiredgov).</entry>
+  <entry id="opt.general.softrealtime">Politica dello scheduler "soft real-time" (SCHED_ISO): "auto" con 4 o più core, "on" sempre, "off" mai. Può migliorare fluidità e latenza nei giochi, ma ha effetto solo su kernel che supportano SCHED_ISO (assente nei kernel upstream).</entry>
+  <entry id="opt.general.renice">Valore di "nice" (0–20) applicato, negato, ai processi di gioco: più alto = priorità CPU maggiore. Migliora la reattività del gioco ma può rallentare il resto del sistema. 0 = nessuna modifica. Richiede il gruppo "gamemode".</entry>
+  <entry id="opt.general.ioprio">Priorità I/O dei processi di gioco: da 0 (massima) a 7 (minima), oppure "off" per disattivarla, "reset" per il comportamento predefinito basato sulla priorità CPU. Più alta = meno caricamenti a scatti, ma penalizza gli altri processi.</entry>
+  <entry id="opt.general.inhibit_screensaver">Se attivo, GameMode impedisce l'attivazione di screensaver e blocco schermo mentre è in esecuzione. Evita interruzioni durante il gioco; disattivalo se preferisci mantenere il risparmio schermo.</entry>
+  <entry id="opt.general.disable_splitlock">Se attivo, GameMode disattiva la mitigazione "split lock" della CPU durante il gioco. Può ridurre i cali di prestazioni di alcuni giochi, ma abbassa la protezione contro certi attacchi: attivalo consapevolmente.</entry>
 
   <entry id="opt.gpu.enable_power_plan.label">Abilita modifica power plan GPU</entry>
-  <entry id="opt.gpu.apply_gpu_optimisations">Imposta la chiave "accept-responsibility" per permettere overclock e ottimizzazioni GPU. Richiede il file in /etc/gamemode.ini.</entry>
-  <entry id="opt.gpu.gpu_device">Numero del dispositivo DRM (di solito 0), cioè il numero in /sys/class/drm/card0/.</entry>
-  <entry id="opt.gpu.nv_powermizer_mode">GPU PowerMizer Mode NVIDIA. "Adaptive"=0, "Prefer Maximum Performance"=1, "Auto"=2. Lasciare "— (predefinito)" per non modificare. Richiede l'estensione coolbits.</entry>
-  <entry id="opt.gpu.nv_core_clock_mhz_offset">Offset in MHz della frequenza GPU (core). 0 ripristina i valori predefiniti, -1 o assente non modifica nulla.</entry>
-  <entry id="opt.gpu.nv_mem_clock_mhz_offset">Offset in MHz della frequenza memoria (GPU). 0 ripristina i valori predefiniti, -1 o assente non modifica nulla.</entry>
-  <entry id="opt.gpu.amd_performance_level">Corrisponde a power_dpm_force_performance_level. Lasciare "— (predefinito)" per non modificare. "manual" non è supportato al momento.</entry>
+  <entry id="opt.gpu.apply_gpu_optimisations">Interruttore principale delle ottimizzazioni [gpu]: attivandolo accetti la responsabilità e GameMode può applicare overclock e power state NVIDIA/AMD. Senza di esso le altre voci [gpu] vengono ignorate. Ha effetto solo con il file in /etc/gamemode.ini (percorso privilegiato).</entry>
+  <entry id="opt.gpu.gpu_device">Numero del dispositivo DRM della scheda da controllare (di solito 0), cioè il numero N in /sys/class/drm/cardN/. Utile solo con più GPU, per indicare quale scheda ottimizzare.</entry>
+  <entry id="opt.gpu.nv_powermizer_mode">Modalità PowerMizer NVIDIA: 0 = Adaptive (equilibrata), 1 = Prefer Maximum Performance (massime prestazioni, più consumo/calore), 2 = Auto. Lasciare "— (predefinito)" per non modificare. Richiede l'estensione coolbits attiva in nvidia-xconfig.</entry>
+  <entry id="opt.gpu.nv_core_clock_mhz_offset">Offset in MHz sulla frequenza massima del core GPU: positivo = più veloce (overclock), negativo = più lento (undervolt). 0 ripristina i valori predefiniti, -1 (o vuoto) non modifica nulla. Richiede coolbits; valori troppo alti possono causare instabilità o crash.</entry>
+  <entry id="opt.gpu.nv_mem_clock_mhz_offset">Offset in MHz sulla frequenza massima della memoria GPU: positivo = più veloce, negativo = più lento. 0 ripristina i valori predefiniti, -1 (o vuoto) non modifica nulla. Richiede coolbits; overclock eccessivi possono causare artefatti grafici o crash.</entry>
+  <entry id="opt.gpu.amd_performance_level">Livello di prestazioni AMDGPU (power_dpm_force_performance_level): "low" riduce consumi e rumore, "high" spinge al massimo le prestazioni, "auto" lascia gestire al driver, "manual" non è supportato qui. Lasciare "— (predefinito)" per non modificare. Richiede un modulo AMDGPU recente.</entry>
 
-  <entry id="opt.cpu.pin_cores">Blocca (pin) il gioco su un insieme specifico di core. Seleziona i core con le caselle; se non ne selezioni nessuno, GameMode rileva automaticamente i core migliori (P-core/E-core).</entry>
-  <entry id="opt.cpu.park_cores">Mette offline (park) i core non usati dal gioco. Richiede l'appartenenza al gruppo 'gamemode'.</entry>
+  <entry id="opt.cpu.pin_cores">Blocca (pin) i processi di gioco su un insieme specifico di core, impedendo che migrino tra core diversi: migliora la coerenza di prestazioni e cache. Seleziona i core con le caselle; se non ne selezioni nessuno, GameMode rileva automaticamente i core migliori (P-core/E-core su Intel).</entry>
+  <entry id="opt.cpu.park_cores">Mette offline (park) i core non usati dal gioco: riduce potenza e calore lasciando i core attivi alla massima frequenza (utile su CPU con pochi core veloci). Richiede l'appartenenza al gruppo 'gamemode'. Su CPU con molti core può ridurre la reattività del sistema mentre giochi.</entry>
 
-  <entry id="opt.custom.start">Elenco di comandi/script eseguiti (tramite /bin/sh) all'avvio di GameMode. Una riga = un comando.</entry>
-  <entry id="opt.custom.end">Elenco di comandi/script eseguiti (tramite /bin/sh) alla fine di GameMode. Una riga = un comando.</entry>
-  <entry id="opt.custom.script_timeout">Tempo massimo (in secondi) concesso agli script: se non terminano entro questo tempo vengono interrotti.</entry>
+  <entry id="custom.notifications.title">Notifiche</entry>
+  <entry id="opt.custom.notify_start.label">Notifica all'avvio</entry>
+  <entry id="opt.custom.notify_start">Aggiunge la voce 'notify-send "GameMode started"' all'avvio di GameMode: mostra una notifica desktop quando GameMode si attiva. Comoda per capire a colpo d'occhio quando le ottimizzazioni sono attive; richiede un demone di notifiche in esecuzione.</entry>
+  <entry id="opt.custom.notify_end.label">Notifica alla fine</entry>
+  <entry id="opt.custom.notify_end">Aggiunge la voce 'notify-send "GameMode ended"' alla fine di GameMode: mostra una notifica desktop quando GameMode si disattiva.</entry>
+
+  <entry id="opt.custom.start">Comandi/script eseguiti (tramite /bin/sh) all'avvio di GameMode: una riga = un comando. Usalo per spegnere servizi, impostare variabili o lanciare script personalizzati. Le voci sono eseguite in ordine.</entry>
+  <entry id="opt.custom.end">Comandi/script eseguiti (tramite /bin/sh) alla fine di GameMode: una riga = un comando. Usalo per ripristinare ciò che hai modificato all'avvio.</entry>
+  <entry id="opt.custom.script_timeout">Tempo massimo (in secondi) concesso agli script di avvio/fine: quelli che non terminano entro questo tempo vengono interrotti. Evita che uno script bloccato ritardi l'attivazione o la disattivazione di GameMode.</entry>
 </translations>

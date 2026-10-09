@@ -3,6 +3,52 @@
 Applicazione desktop (GTK4 + Libadwaita) per gestire in modo visuale, sicuro
 e intuitivo il file `gamemode.ini` del daemon **Feral GameMode**.
 
+## Filosofia (come concordato)
+
+- **File unico in `/etc/gamemode.ini`** (percorso privilegiato). Niente doppia
+  gestione tra `.config` e `/etc`: la GUI lavora solo sul file di sistema, dove
+  il daemon applica *anche* le ottimizzazioni `[gpu]`.
+- **Commit con riscrittura totale del file** (copy-on-write):
+  1. contenuto nuovo su `gamemode.ini.tmp` + `fsync`;
+  2. il file attivo precedente è copiato in `gamemode.ini.bak`;
+  3. `os.replace(tmp, gamemode.ini)` (atomico);
+  4. `gamemode.ini.orig` = copia "vergine" iniziale, creata una sola volta;
+  5. su errore: rollback automatico da `.bak`.
+- **Solo le opzioni attive finiscono nel file**: un'opzione viene scritta solo
+  se il suo valore differisce dal default (o se la lista non è vuota), perché
+  GameMode applica già i default da sé. Alcune opzioni (`[gpu]`) richiedono un
+  interruttore abilitante (`apply_gpu_optimisations=accept-responsibility`).
+- **Stato delle scelte in memoria** (solo valori) e salvataggio in
+  `gamemode.ini.session.json` a ogni commit, così lo stato è riapribile.
+- **i18n via file esterni XML** (`locale/<lang>.xml`): italiano e inglese.
+  L'elenco delle lingue disponibili è letto dalla chiave `supported_langs` di
+  `~/.config/gamemode-gui/settings.json` (default: `it`, `en`): per aggiungere
+  una lingua basta il file `locale/<codice>.xml` (con attributo `name` per il
+  nome mostrato nel menu) e il codice nella lista. Le voci non valide (codice
+  errato o senza file) vengono ignorate e segnalate, senza bloccare l'app. La
+  lingua predefinita viene dal locale di sistema (`it`/`en`, altrimenti
+  inglese); la scelta fatta nella GUI ha la precedenza su tutto. Niente
+  stringhe hardcoded nel codice.
+- **Opzioni data-driven** (`options.json`): ogni opzione è una voce JSON per
+  categoria con `key`, `description_id`, `value_type`, `range`, `widget`,
+  `default`, `special`, ecc. Aggiungere/modificare un'opzione = modificare il
+  JSON, non il codice. I valori `special` (es. governor CPU, core CPU per il
+  pinning) non sono statici: vengono letti dal sistema.
+- **Pochi file** (refactoring): logica in `core.py`, interfaccia in `ui.py`,
+  **widget riutilizzabili in `widgets.py`** (`build_widget` standard per tipo,
+  scelta a radio button, stepper -/+, editor di liste) così da non duplicare
+  codice tra le schede.
+- **Navigazione a schede** (`Adw.ViewStack` + `Adw.ViewSwitcher`): Generale,
+  GPU, Riepilogo, Daemon. Ogni scheda di opzioni ha il proprio pulsante
+  **Salva**, che riscrive il file con tutte le opzioni attive. La scheda GPU ha
+  un interruttore **"Abilita modifica power plan GPU"** che scrive
+  `apply_gpu_optimisations=accept-responsibility`: le altre voci `[gpu]` sono
+  utilizzabili e scritte solo quando è attivo. La scheda Custom ha in cima una
+  card **Notifiche** con due interruttori che aggiungono/rimuovono le notifiche
+  desktop (`notify-send "GameMode started"` / `"GameMode ended"`) all'avvio e
+  alla fine di GameMode, senza doverle scrivere a mano nelle liste `start`/`end`.
+
+>>>>>>> 159d563 (Lingua salvata + file inglese, rimozione scheda Filtro, toggle notifiche Custom, stile accento, refactoring e descrizioni)
 ## Struttura
 
 ```
@@ -17,7 +63,10 @@ gamemode-gui/
 │                     ChoicePicker (radio, niente dropdown), StepperBox (-/+),
 │                     ListEditor, OptionRow (nome+descrizione su una riga)
 ├── privileged.py     helper eseguito come root (pkexec/sudo) per scrivere /etc
-├── locale/it.xml     traduzioni (italiano, configurabile)
+├── fileops.py        scrittura atomica + backup/rollback (condivisa GUI/root)
+├── style.css         stile dell'app (CSS caricato a runtime)
+├── locale/it.xml     traduzioni (italiano)
+├── locale/en.xml     traduzioni (inglese)
 ├── test_core.py      test della logica (senza GUI)
 └── smoke_test.py     test dell'interfaccia (richiede DISPLAY, usa cartella
                       temporanea, non tocca la config reale)
@@ -75,8 +124,8 @@ Entrambi installano:
 
 ```
 /usr/bin/gamemode-gui                                        # launcher
-/usr/share/gamemode-gui/{main,core,ui,widgets,privileged}.py
-/usr/share/gamemode-gui/{options.json,locale/it.xml}
+/usr/share/gamemode-gui/{main,core,ui,widgets,privileged,fileops}.py
+/usr/share/gamemode-gui/{options.json,style.css,locale/it.xml,locale/en.xml}
 /usr/share/applications/io.github.gamemodegui.GameModeGui.desktop
 /usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
 ```
@@ -98,7 +147,7 @@ GameMode carica **più file** e li fonde in ordine (`gamemode-config.c`), con
 | 3 | `~/.config/gamemode.ini` (o `$XDG_CONFIG_HOME`) | unsafe | config utente |
 | 4 | `$PWD/gamemode.ini` | unsafe | directory di lavoro del daemon |
 
-Le **liste** (`whitelist`/`blacklist`, `start`/`end`) si accodano; i **valori
+Le **liste** (`start`/`end` degli script custom) si accodano; i **valori
 scalari sovrascrivono** quelli dei file precedenti → vince l'ultimo letto.
 
 **La GUI usa il file installato come base e scrive gli override in

@@ -8,155 +8,49 @@ comando a sé stante invocato con subprocess.
 Perché esiste?
     Il file che vogliamo gestire vive in ``/etc`` (root-owned). La GUI gira
     come utente normale, quindi tutte le *scritture* (tmp, backup, replace,
-    rollback) devono avvenire in un processo privilegiato. Il costo è che si
-    riscrive il file completo al commit (strategia "copy on write"): si scrive
-    ``.tmp``, si fa ``fsync``, si copia il vecchio in ``.bak`` e infine si
-    ``os.replace(tmp, target)`` che è atomico su POSIX.
+    rollback) devono avvenire in un processo privilegiato.
+
+La logica di scrittura atomica/backup/rollback NON è qui: sta in ``fileops.py``,
+condivisa con il percorso locale della GUI. Questo file si occupa solo del
+parsing della riga di comando e dell'I/O da stdin.
 
 Comandi:
-    commit <path>                riscrive il file leggendo il contenuto da stdin.
-                                 Garantisce anche la creazione di ``.orig`` (una
-                                 sola volta) e del ``.bak`` (precedente).
-    restore-backup <path>        ripristina ``.bak`` -> file attivo.
-    restore-orig <path>          ripristina ``.orig`` -> file attivo.
-    ensure-orig <path>           crea ``.orig`` se assente (stdin = contenuto di
-                                 default da usare quando il file non esiste).
+    commit <path> [seed]     riscrive il file leggendo il contenuto da stdin.
+                             ``seed`` è il percorso opzionale di un file con il
+                             contenuto "vergine" da usare per ``.orig``.
+    restore-backup <path>    ripristina ``.bak`` -> file attivo.
+    restore-orig <path>      ripristina ``.orig`` -> file attivo.
+    ensure-orig <path>       crea ``.orig`` se assente (stdin = contenuto di
+                             default da usare quando il file non esiste).
 
 File gestiti (tutti accanto a <path>):
     <path>.tmp   contenuto nuovo, non ancora committato
     <path>.bak   copia del file attivo precedente al commit
     <path>.orig  copia iniziale "vergine" (mai riscritta automaticamente)
-
-La regola pratica: se l'operazione fallisce a metà (es. errore io su replace),
-il comando tenta di ripristinare il ``.bak`` e termina con exit code != 0.
 """
 
 from __future__ import annotations
 
-import os
-import shutil
 import sys
 
-
-# ---------------------------------------------------------------------------
-# Operazioni di base (indipendenti dal fatto che si esegua come root)
-# ---------------------------------------------------------------------------
-def _fsync_file(path: str) -> None:
-    with open(path, "rb") as fh:
-        os.fsync(fh.fileno())
+import fileops
 
 
-def write_new_commit(target: str, content: str, orig_seed_path: str | None = None) -> None:
-    """Esegue un commit atomico di ``content`` su ``target``.
-
-    Sequenza (allineata alla specifica):
-      1. scrivi ``target.tmp`` + fsync
-      2. se ``target`` esiste, copia in ``target.bak``
-      3. ``os.replace(tmp, target)``  -> atomico
-      4. chmod 0644 sul file attivo
-      5. pulizia eventuale tmp residuo
-
-    Su errore al passo 3 il ``.bak`` viene ripristinato automaticamente.
-    """
-    tmp = target + ".tmp"
-
-    # 1. contenuto nuovo su file temporaneo, sincronizzato su disco
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(content)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.chmod(tmp, 0o644)
-
-    # 2. "orig" = stato iniziale, creato UNA sola volta, mai ritoccato.
-    #    Se il file attivo esiste lo copiamo; se non esiste (primo avvio) lo
-    #    seed (il file installato dal pacchetto) o il contenuto che stiamo per
-    #    scrivere.
-    _ensure_orig(target, tmp, orig_seed_path)
-
-    # 3. backup del file attivo precedente (il "prima" del commit)
-    had_previous = os.path.isfile(target)
-    if had_previous:
-        shutil.copy2(target, target + ".bak")
-
-    # 4. commit atomico
+def _read_seed(path: str | None) -> str | None:
+    """Legge il file "seed" (contenuto vergine) se indicato, altrimenti None."""
+    if not path:
+        return None
     try:
-        os.replace(tmp, target)
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read()
     except OSError:
-        # rollback automatico: ripristina il file precedente dal backup
-        if had_previous and os.path.isfile(target + ".bak"):
-            shutil.copy2(target + ".bak", target)
-        raise
-
-    os.chmod(target, 0o644)
-
-    # 5. pulizia residui
-    if os.path.exists(tmp):
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
+        return None
 
 
-def _ensure_orig(target: str, new_content_path: str,
-                 seed_path: str | None = None) -> None:
-    """Crea ``<target>.orig`` se non esiste ancora (una volta in assoluto)."""
-    orig = target + ".orig"
-    if os.path.exists(orig):
-        return
-    if os.path.isfile(target):
-        source = target
-    elif seed_path and os.path.isfile(seed_path):
-        source = seed_path
-    else:
-        source = new_content_path
-    shutil.copy2(source, orig)
-    os.chmod(orig, 0o644)
-
-
-def restore_from_backup(target: str) -> None:
-    if not os.path.isfile(target + ".bak"):
-        raise FileNotFoundError("nessun backup disponibile")
-    shutil.copy2(target + ".bak", target)
-    os.chmod(target, 0o644)
-
-
-def restore_from_orig(target: str) -> None:
-    if not os.path.isfile(target + ".orig"):
-        raise FileNotFoundError("nessun originale disponibile")
-    shutil.copy2(target + ".orig", target)
-    os.chmod(target, 0o644)
-
-
-def ensure_orig(target: str, default_content: str) -> None:
-    """Crea ``.orig`` da un contenuto di default (usato solo in assenza del
-    file attivo, tipicamente al primo avvio dell'applicazione)."""
-    if os.path.exists(target + ".orig"):
-        return
-    source = target if os.path.isfile(target) else _write_ephemeral(default_content)
-    shutil.copy2(source, target + ".orig")
-    os.chmod(target + ".orig", 0o644)
-
-
-def _write_ephemeral(content: str) -> str:
-    import tempfile
-    fd, path = tempfile.mkstemp(prefix="gamemode-orig-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(content)
-            fh.flush()
-            os.fsync(fh.fileno())
-    except Exception:
-        os.unlink(path)
-        raise
-    return path
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        sys.stderr.write("uso: privileged.py <commit|restore-backup|restore-orig|ensure-orig> <path> [--] \n")
+        sys.stderr.write(
+            "uso: privileged.py <commit|restore-backup|restore-orig|ensure-orig> <path> [seed]\n")
         return 2
 
     command, target = argv[0], argv[1]
@@ -164,18 +58,19 @@ def main(argv: list[str]) -> int:
     try:
         if command == "commit":
             content = sys.stdin.read()
-            seed = argv[2] if len(argv) > 2 else None
-            write_new_commit(target, content, seed)
+            seed_path = argv[2] if len(argv) > 2 else None
+            fileops.write_commit(target, content,
+                                 orig_seed_content=_read_seed(seed_path))
             sys.stdout.write("ok\n")
         elif command == "restore-backup":
-            restore_from_backup(target)
+            fileops.restore_from_backup(target)
             sys.stdout.write("ok\n")
         elif command == "restore-orig":
-            restore_from_orig(target)
+            fileops.restore_from_orig(target)
             sys.stdout.write("ok\n")
         elif command == "ensure-orig":
             content = sys.stdin.read()
-            ensure_orig(target, content)
+            fileops.ensure_orig(target, seed_content=content)
             sys.stdout.write("ok\n")
         else:
             sys.stderr.write(f"comando sconosciuto: {command}\n")

@@ -128,32 +128,6 @@
       ]
     },
     {
-      "id": "filter",
-      "tab_id": "tab.filter",
-      "title_id": "step.filter.title",
-      "subtitle_id": "step.filter.subtitle",
-      "options": [
-        {
-          "key": "whitelist",
-          "description_id": "opt.filter.whitelist",
-          "value_type": "list",
-          "widget": "list",
-          "default": [],
-          "special": false,
-          "comment": "; If \"whitelist\" entry has a value(s)\n; gamemode will reject anything not in the whitelist"
-        },
-        {
-          "key": "blacklist",
-          "description_id": "opt.filter.blacklist",
-          "value_type": "list",
-          "widget": "list",
-          "default": [],
-          "special": false,
-          "comment": "; Gamemode will always reject anything in the blacklist"
-        }
-      ]
-    },
-    {
       "id": "gpu",
       "tab_id": "tab.gpu",
       "title_id": "step.gpu.title",
@@ -259,7 +233,30 @@
       "tab_id": "tab.custom",
       "title_id": "step.custom.title",
       "subtitle_id": "step.custom.subtitle",
+      "toggle_card_id": "custom.notifications.title",
       "options": [
+        {
+          "key": "notify_start",
+          "description_id": "opt.custom.notify_start",
+          "label_id": "opt.custom.notify_start.label",
+          "value_type": "toggle_entry",
+          "widget": "switch",
+          "default": false,
+          "special": false,
+          "target": "custom.start",
+          "entry": "notify-send \"GameMode started\""
+        },
+        {
+          "key": "notify_end",
+          "description_id": "opt.custom.notify_end",
+          "label_id": "opt.custom.notify_end.label",
+          "value_type": "toggle_entry",
+          "widget": "switch",
+          "default": false,
+          "special": false,
+          "target": "custom.end",
+          "entry": "notify-send \"GameMode ended\""
+        },
         {
           "key": "start",
           "description_id": "opt.custom.start",

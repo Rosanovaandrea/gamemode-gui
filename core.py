@@ -21,44 +21,268 @@ import getpass
 import grp
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
+import fileops
+
 # ===========================================================================
 # 1. INTERNAZIONALIZZAZIONE (i18n)
 # ===========================================================================
-# La lingua è gestita tramite file esterni in `locale/<lang>.xml`. Attualmente
-# esiste solo l'italiano, ma il sistema è configurabile: basta aggiungere un
-# altro file XML (es. locale/en.xml) e selezionare la lingua con la variabile
-# d'ambiente GAMEMODE_LANG o con il rilevamento automatico di sistema.
+# La lingua è gestita tramite file esterni in `locale/<lang>.xml`.
+#
+# L'elenco delle lingue disponibili NON è hardcoded: si legge dalla chiave
+# `supported_langs` del file impostazioni (settings.json), con fallback sui
+# default italiano/inglese. Ogni voce viene validata: un codice senza file
+# `locale/<codice>.xml` viene scartato e segnalato (vedi
+# `describe_lang_errors()`), senza bloccare l'app.
+#
+# Ordine di priorità con cui si sceglie la lingua attiva:
+#   1. scelta salvata dall'utente (`lang` in settings.json): precedenza su tutto;
+#   2. locale di sistema (LC_ALL > LC_MESSAGES > LANG);
+#   3. inglese ("en") come default.
+#
 # Niente stringhe hardcoded nel codice: si usa `tr("chiave")`.
 
 _LOCALE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locale")
-_DEFAULT_LANG = "it"
+_DEFAULT_SUPPORTED_LANGS = ("it", "en")
+_DEFAULT_LANG = "en"
 
 try:
     import xml.etree.ElementTree as _ET
 except Exception:  # pragma: no cover
     _ET = None
 
+# Cache dell'elenco lingue validato + errori di configurazione. Gli errori sono
+# coppie (tipo, dettaglio) formattabili con `describe_lang_errors()`: non si usa
+# `tr()` qui perché verrebbe chiamato prima che il traduttore esista.
+_langs_cache: Optional[tuple] = None
+_langs_errors: List[tuple] = []
 
-def _detect_lang() -> str:
-    """Lingua richiesta: variabile d'ambiente sovrascrive il sistema."""
-    env = os.environ.get("GAMEMODE_LANG", "").strip()
-    if env:
-        return env
+
+def normalize_lang_code(raw: object) -> Optional[str]:
+    """Riduce un codice lingua alla forma breve minuscola (``it``, ``en``, …).
+
+    Accetta ``it``, ``it_IT``, ``it_IT.UTF-8``, ``en-US`` e simili. NON verifica
+    che la lingua sia supportata: lo fa `supported_lang`.
+    """
+    if not raw:
+        return None
+    code = str(raw).strip().lower()
+    for sep in (".", "@"):
+        code = code.split(sep, 1)[0]
+    code = code.replace("-", "_").split("_", 1)[0]
+    return code or None
+
+
+def lang_file_path(code: str) -> str:
+    """Percorso del file di lingua ``locale/<code>.xml``."""
+    return os.path.join(_LOCALE_DIR, f"{code}.xml")
+
+
+def _has_lang_file(code: str) -> bool:
+    return os.path.isfile(lang_file_path(code))
+
+
+def _compute_supported_langs() -> None:
+    """Calcola una volta l'elenco lingue valido e registra gli errori di config.
+
+    Errori possibili (coppie tipo/dettaglio):
+      * ``bad_config``   → settings.json illeggibile o non un oggetto JSON;
+      * ``bad_list``     → `supported_langs` non è una lista;
+      * ``bad_entry``    → voce della lista non è un codice valido;
+      * ``missing_file`` → lingua senza `locale/<codice>.xml`;
+      * ``empty``        → nessuna lingua utilizzabile (fallback sull'inglese).
+    """
+    global _langs_cache, _langs_errors
+    errors: List[tuple] = []
+
+    raw = load_settings().get("supported_langs")
+    if _settings_load_failed:
+        errors.append(("bad_config", ""))
+
+    configured: Optional[List[str]] = None
+    if raw is None:
+        configured = None
+    elif isinstance(raw, list):
+        configured = []
+        for item in raw:
+            if not isinstance(item, str):
+                errors.append(("bad_entry", str(item)))
+                continue
+            code = normalize_lang_code(item)
+            if code is None:
+                errors.append(("bad_entry", str(item)))
+            elif code not in configured:
+                configured.append(code)
+    else:
+        errors.append(("bad_list", ""))
+
+    candidates = configured if configured else list(_DEFAULT_SUPPORTED_LANGS)
+
+    valid: List[str] = []
+    for code in candidates:
+        if _has_lang_file(code):
+            if code not in valid:
+                valid.append(code)
+        else:
+            errors.append(("missing_file", code))
+
+    # Se nessuna lingua configurata è utilizzabile, torna ai default sicuri.
+    if not valid:
+        for code in _DEFAULT_SUPPORTED_LANGS:
+            if _has_lang_file(code) and code not in valid:
+                valid.append(code)
+        if not valid:
+            errors.append(("empty", ""))
+
+    _langs_cache = tuple(valid) if valid else (_DEFAULT_LANG,)
+    _langs_errors = errors
+
+
+def supported_langs() -> tuple:
+    """Elenco lingue supportate: letto dalla config e validato sui file."""
+    if _langs_cache is None:
+        _compute_supported_langs()
+    return _langs_cache
+
+
+def reset_supported_langs() -> None:
+    """Invalida la cache dell'elenco lingue (usato quando cambia la config)."""
+    global _langs_cache
+    _langs_cache = None
+
+
+def lang_label(code: str) -> str:
+    """Nome della lingua dall'attributo ``name`` del suo XML, o il codice maiuscolo."""
+    path = lang_file_path(code)
+    if _ET is not None and os.path.isfile(path):
+        try:
+            name = (_ET.parse(path).getroot().get("name") or "").strip()
+            if name:
+                return name
+        except Exception:
+            pass
+    return code.upper()
+
+
+def available_langs() -> List[tuple]:
+    """Coppie ``(codice, nome)`` per il menu, nell'ordine configurato."""
+    return [(code, lang_label(code)) for code in supported_langs()]
+
+
+def _fallback_lang() -> str:
+    """Lingua di ripiego: il default se disponibile, altrimenti la prima valida."""
+    langs = supported_langs()
+    if _DEFAULT_LANG in langs:
+        return _DEFAULT_LANG
+    return langs[0] if langs else _DEFAULT_LANG
+
+
+def supported_lang(raw: object) -> Optional[str]:
+    """Codice normalizzato, solo se è una lingua supportata; altrimenti ``None``."""
+    code = normalize_lang_code(raw)
+    return code if code and code in supported_langs() else None
+
+
+def detect_system_lang() -> str:
+    """Lingua dal locale di sistema, con fallback sicuro.
+
+    Rispetta la precedenza standard delle variabili d'ambiente
+    (LC_ALL > LC_MESSAGES > LANG): vince la prima impostata; se non è una lingua
+    supportata, si usa il fallback (inglese).
+    """
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        raw = os.environ.get(var, "").strip()
+        if raw:
+            return supported_lang(raw) or _fallback_lang()
+    return _fallback_lang()
+
+
+# --- preferenza dell'utente (impostazioni dell'app) ------------------------
+# Separata dal file gamemode.ini: è una preferenza dell'applicazione, non una
+# opzione del daemon, e non deve finire in /etc.
+
+# True se l'ultima lettura di settings.json è fallita (file rotto o non oggetto).
+_settings_load_failed = False
+
+
+def settings_dir() -> str:
+    """Cartella delle impostazioni dell'utente (rispetta XDG_CONFIG_HOME)."""
+    base = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    if not base:
+        base = os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "gamemode-gui")
+
+
+def settings_path() -> str:
+    return os.path.join(settings_dir(), "settings.json")
+
+
+def load_settings() -> Dict[str, object]:
+    """Legge ``settings.json``; se assente o illeggibile restituisce ``{}``.
+
+    In caso di file illeggibile o non oggetto JSON segnala l'errore (usato per
+    avvisare l'utente) e prosegue con i default.
+    """
+    global _settings_load_failed
+    _settings_load_failed = False
     try:
-        import locale
-        code, _ = locale.getdefaultlocale(("LANG", "LC_ALL"))
-        if code:
-            return code.split("_")[0]
-    except Exception:
+        with open(settings_path(), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        _settings_load_failed = True
+        return {}
+    if not isinstance(data, dict):
+        _settings_load_failed = True
+        return {}
+    return data
+
+
+def save_settings(settings: Dict[str, object]) -> None:
+    """Scrive ``settings.json`` (best effort, mai fatale)."""
+    try:
+        os.makedirs(settings_dir(), mode=0o700, exist_ok=True)
+        with open(settings_path(), "w", encoding="utf-8") as fh:
+            json.dump(settings, fh, indent=2)
+    except OSError:
         pass
-    return _DEFAULT_LANG
+
+
+def ensure_settings() -> None:
+    """Garantisce che settings.json esista e contenga ``supported_langs``.
+
+    Il file viene creato al primo avvio con l'elenco lingue predefinito, così è
+    direttamente leggibile/modificabile dall'utente.
+    """
+    settings = load_settings()
+    if "supported_langs" not in settings:
+        settings["supported_langs"] = list(_DEFAULT_SUPPORTED_LANGS)
+        save_settings(settings)
+
+
+def load_saved_lang() -> Optional[str]:
+    """Lingua scelta dall'utente, se presente e supportata; altrimenti None."""
+    return supported_lang(load_settings().get("lang"))
+
+
+def save_lang(lang: str) -> None:
+    """Salva la lingua scelta dall'utente (avrà la precedenza su tutto)."""
+    code = supported_lang(lang) or _fallback_lang()
+    settings = load_settings()
+    settings.setdefault("supported_langs", list(_DEFAULT_SUPPORTED_LANGS))
+    settings["lang"] = code
+    save_settings(settings)
+
+
+def resolve_lang() -> str:
+    """Lingua effettiva: scelta salvata > locale di sistema > fallback."""
+    return load_saved_lang() or detect_system_lang() or _fallback_lang()
 
 
 class Translator:
@@ -69,16 +293,19 @@ class Translator:
     """
 
     def __init__(self, lang: Optional[str] = None) -> None:
-        self.lang = lang or _detect_lang()
+        self.lang = lang or resolve_lang()
         self._strings: Dict[str, str] = {}
         self._load()
 
     def _load(self) -> None:
         if _ET is None:
             return
-        path = os.path.join(_LOCALE_DIR, f"{self.lang}.xml")
+        # Fallback a catena: lingua attiva → lingua di ripiego → default.
+        path = lang_file_path(self.lang)
         if not os.path.isfile(path):
-            path = os.path.join(_LOCALE_DIR, f"{_DEFAULT_LANG}.xml")
+            path = lang_file_path(_fallback_lang())
+        if not os.path.isfile(path):
+            path = lang_file_path(_DEFAULT_LANG)
         if not os.path.isfile(path):
             return
         try:
@@ -98,8 +325,35 @@ _translator = Translator()
 
 
 def tr(key: str) -> str:
-    """Traduci una chiave nella lingua corrente (predefinita: italiano)."""
+    """Traduci una chiave nella lingua corrente (predefinita: inglese)."""
     return _translator.tr(key)
+
+
+def current_lang() -> str:
+    """Codice della lingua attualmente attiva nel traduttore."""
+    return _translator.lang
+
+
+def describe_lang_errors() -> List[str]:
+    """Messaggi localizzati sugli errori di configurazione delle lingue.
+
+    Va chiamata a UI pronta (usa `tr`); gli errori grezzi sono in
+    ``_langs_errors``, calcolati quando si legge l'elenco lingue.
+    """
+    supported_langs()  # assicura che gli errori siano stati calcolati
+    messages: List[str] = []
+    for kind, detail in _langs_errors:
+        if kind == "missing_file":
+            messages.append(tr("msg.lang.missing_file").format(lang=detail))
+        elif kind == "bad_entry":
+            messages.append(tr("msg.lang.bad_entry").format(value=detail))
+        elif kind == "bad_list":
+            messages.append(tr("msg.lang.bad_list"))
+        elif kind == "bad_config":
+            messages.append(tr("msg.lang.bad_config"))
+        elif kind == "empty":
+            messages.append(tr("msg.lang.empty"))
+    return messages
 
 
 # ===========================================================================
@@ -110,8 +364,8 @@ def tr(key: str) -> str:
 #   key             nome della chiave INI
 #   description_id  chiave i18n della descrizione
 #   label_id        (opzionale) chiave i18n del nome visibile (default: key)
-#   value_type      int | float | bool | string | choice | list | enable
-#   widget          stepper | switch | radio | list | entry
+#   value_type      int | float | bool | string | choice | list | cores | enable | toggle_entry
+#   widget          stepper | switch | radio | list | cores | entry
 #   range           [min, max] per i numerici (null = illimitato)
 #   choices         valori ammessi per value_type "choice"
 #   default         valore di default
@@ -120,6 +374,11 @@ def tr(key: str) -> str:
 #   on_value        per value_type "enable": valore scritto quando è attivo
 #   depends_on      id di un'altra opzione da cui questa dipende
 #   comment         commento emesso nel file INI sopra l'opzione
+#   target/entry    per value_type "toggle_entry": l'interruttore aggiunge/rimuove
+#                   la stringa `entry` dalla lista `target` (es. notifica in start)
+#
+# A livello di categoria, `toggle_card_id` è la chiave i18n del titolo della card
+# che raccoglie le opzioni "toggle_entry" in cima alla scheda.
 
 _OPTIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "options.json")
 
@@ -146,6 +405,8 @@ class OptionSpec:
     on_value: Optional[str] = None
     depends_on: Optional[str] = None
     comment: str = ""
+    target: Optional[str] = None
+    entry: Optional[str] = None
 
     @property
     def id(self) -> str:
@@ -166,6 +427,7 @@ class Category:
     subtitle_id: str
     banner_id: Optional[str]
     options: tuple
+    toggle_card_id: Optional[str] = None
 
 
 def _spec_from_json(section: str, raw: dict) -> OptionSpec:
@@ -190,6 +452,8 @@ def _spec_from_json(section: str, raw: dict) -> OptionSpec:
         on_value=raw.get("on_value"),
         depends_on=raw.get("depends_on"),
         comment=raw.get("comment", ""),
+        target=raw.get("target"),
+        entry=raw.get("entry"),
     )
 
 
@@ -208,6 +472,7 @@ def load_categories(path: str = _OPTIONS_FILE) -> List[Category]:
             subtitle_id=cat.get("subtitle_id", f"step.{section}.subtitle"),
             banner_id=cat.get("banner_id"),
             options=specs,
+            toggle_card_id=cat.get("toggle_card_id"),
         ))
     return categories
 
@@ -217,9 +482,16 @@ OPTIONS: List[OptionSpec] = [spec for cat in CATEGORIES for spec in cat.options]
 SECTIONS_ORDER: List[str] = [cat.id for cat in CATEGORIES]
 OPTIONS_BY_ID: Dict[str, OptionSpec] = {spec.id: spec for spec in OPTIONS}
 
+# Opzioni raggruppate per sezione, nell'ordine di options.json (usato dal renderer).
+OPTIONS_BY_SECTION: Dict[str, List[OptionSpec]] = {section: [] for section in SECTIONS_ORDER}
+for _spec in OPTIONS:
+    OPTIONS_BY_SECTION.setdefault(_spec.section, []).append(_spec)
 
-def options_for_section(section: str) -> list:
-    return [opt for opt in OPTIONS if opt.section == section]
+# Opzioni "toggle_entry" raggruppate per lista bersaglio (es. custom.start).
+TOGGLE_ENTRIES_BY_TARGET: Dict[str, List[OptionSpec]] = {}
+for _spec in OPTIONS:
+    if _spec.type == "toggle_entry" and _spec.target:
+        TOGGLE_ENTRIES_BY_TARGET.setdefault(_spec.target, []).append(_spec)
 
 
 # ===========================================================================
@@ -398,6 +670,8 @@ def is_written(spec: OptionSpec, value) -> bool:
     differisce dal default (o, per le liste, se non sono vuote). I default non
     vengono scritti perché GameMode li applica già da sé.
     """
+    if spec.type == "toggle_entry":
+        return False
     if spec.type in ("list", "cores"):
         return bool(value)
     if spec.type == "bool":
@@ -407,6 +681,20 @@ def is_written(spec: OptionSpec, value) -> bool:
             return False
         return str(value) != str(spec.default)
     return value is not None and value != spec.default
+
+
+def effective_list_value(spec: OptionSpec, values: Dict[str, object]) -> List[str]:
+    """Lista effettiva di un'opzione ``list``.
+
+    Aggiunge in testa le stringhe delle opzioni ``toggle_entry`` attive che
+    hanno questa lista come ``target`` (es. la notifica di avvio in ``start``).
+    """
+    items: List[str] = []
+    for toggle in TOGGLE_ENTRIES_BY_TARGET.get(spec.id, ()):
+        if values.get(toggle.id, toggle.default):
+            items.append(toggle.entry)
+    items.extend(values.get(spec.id) or [])
+    return items
 
 
 def dependency_met(spec: OptionSpec, values: Dict[str, object]) -> bool:
@@ -431,10 +719,12 @@ def render_ini(values: Dict[str, object], comments: Optional[Dict[str, str]] = N
     lines: list = []
     for section in SECTIONS_ORDER:
         section_lines = []
-        for spec in OPTIONS:
-            if spec.section != section:
-                continue
+        for spec in OPTIONS_BY_SECTION.get(section, ()):
+            if spec.type == "toggle_entry":
+                continue  # non ha una propria riga: agisce sulla lista target
             value = values.get(spec.id, spec.default)
+            if spec.type == "list":
+                value = effective_list_value(spec, values)
             if not dependency_met(spec, values):
                 continue
             if not is_written(spec, value):
@@ -528,6 +818,29 @@ def _parse_scalar(kind: str, raw_list: List[str]) -> object:
     return raw
 
 
+def coerce_value(spec: OptionSpec, raw) -> object:
+    """Converte un valore grezzo (es. da sessione JSON) al tipo della spec.
+
+    In caso di valore non convertibile o non ammesso restituisce il default
+    della spec: è l'equivalente "di tipo" di `values_from_parsed`, ma per dati
+    già tipizzati (JSON) invece che testo INI.
+    """
+    try:
+        if spec.type == "int":
+            return int(raw)
+        if spec.type == "float":
+            return float(raw)
+        if spec.type in ("bool", "toggle_entry"):
+            return bool(raw)
+        if spec.type == "list":
+            return list(raw) if isinstance(raw, list) else [str(raw)]
+        if spec.type == "choice" and spec.choices and raw not in spec.choices:
+            return spec.default
+        return raw
+    except (TypeError, ValueError):
+        return spec.default
+
+
 def values_from_parsed(parsed, base: Optional[Dict[str, object]] = None) -> Dict[str, object]:
     """Costruisce i valori correnti a partire da un INI già parsato.
 
@@ -566,6 +879,23 @@ def load_values_from_file(path: Optional[str]) -> Dict[str, object]:
     return load_effective_values(None, path)
 
 
+def _extract_toggle_entries(values: Dict[str, object]) -> None:
+    """Sincronizza gli interruttori ``toggle_entry`` con le liste lette.
+
+    Se una lista (es. ``custom.start``) contiene la stringa gestita da un
+    interruttore, l'interruttore viene acceso e la stringa rimossa dalla lista:
+    la lista resta così solo gli script "liberi", mentre la stringa gestita
+    viene riaggiunta al render. Così c'è una sola fonte di verità per ciascuna.
+    """
+    for spec in OPTIONS:
+        if spec.type != "toggle_entry" or not spec.target or not spec.entry:
+            continue
+        target = values.get(spec.target)
+        if isinstance(target, list) and spec.entry in target:
+            values[spec.id] = True
+            values[spec.target] = [item for item in target if item != spec.entry]
+
+
 def load_effective_values(base_path: Optional[str],
                           override_path: Optional[str]) -> Dict[str, object]:
     """Valori effettivi = default, poi file installato, poi override /etc.
@@ -580,6 +910,7 @@ def load_effective_values(base_path: Optional[str],
                 values = values_from_parsed(parse_ini_file(path), values)
             except OSError:
                 pass
+    _extract_toggle_entries(values)
     return values
 
 
@@ -675,51 +1006,16 @@ class ConfigManager:
             return None
 
     def _save_local(self, content: str) -> None:
-        directory = os.path.dirname(self.config_path) or "."
-        os.makedirs(directory, mode=0o700, exist_ok=True)
-        with open(self.tmp_path, "w", encoding="utf-8") as fh:
-            fh.write(content)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.chmod(self.tmp_path, 0o644)
-
-        if not os.path.isfile(self.orig_path):
-            if os.path.isfile(self.config_path):
-                shutil.copy2(self.config_path, self.orig_path)
-            elif self.orig_seed:
-                with open(self.orig_path, "w", encoding="utf-8") as fh:
-                    fh.write(self.orig_seed)
-            else:
-                shutil.copy2(self.tmp_path, self.orig_path)
-            os.chmod(self.orig_path, 0o644)
-
-        had_previous = os.path.isfile(self.config_path)
-        if had_previous:
-            shutil.copy2(self.config_path, self.backup_path)
-
-        try:
-            os.replace(self.tmp_path, self.config_path)
-        except OSError:
-            if had_previous and os.path.isfile(self.backup_path):
-                shutil.copy2(self.backup_path, self.config_path)
-            raise
-
-        os.chmod(self.config_path, 0o644)
-        if os.path.exists(self.tmp_path):
-            try:
-                os.remove(self.tmp_path)
-            except OSError:
-                pass
+        """Commit atomico sul percorso locale (logica condivisa in fileops)."""
+        fileops.write_commit(self.config_path, content,
+                             orig_seed_content=self.orig_seed, create_dirs=True)
 
     def rollback_from_backup(self) -> bool:
         try:
             if is_privileged_path(self.config_path):
                 proc = run_privileged("restore-backup", self.config_path)
                 return proc.returncode == 0
-            if not os.path.isfile(self.backup_path):
-                return False
-            shutil.copy2(self.backup_path, self.config_path)
-            os.chmod(self.config_path, 0o644)
+            fileops.restore_from_backup(self.config_path)
             return True
         except OSError:
             return False
@@ -729,10 +1025,7 @@ class ConfigManager:
             if is_privileged_path(self.config_path):
                 proc = run_privileged("restore-orig", self.config_path)
                 return proc.returncode == 0
-            if not os.path.isfile(self.orig_path):
-                return False
-            shutil.copy2(self.orig_path, self.config_path)
-            os.chmod(self.config_path, 0o644)
+            fileops.restore_from_orig(self.config_path)
             return True
         except OSError:
             return False
@@ -749,10 +1042,8 @@ class ConfigManager:
             try:
                 directory = os.path.dirname(self.config_path) or "."
                 os.makedirs(directory, mode=0o700, exist_ok=True)
-                if not os.path.isfile(self.orig_path):
-                    with open(self.orig_path, "w", encoding="utf-8") as fh:
-                        fh.write(self.read_existing() or default_ini())
-                    os.chmod(self.orig_path, 0o644)
+                fileops.ensure_orig(self.config_path,
+                                    seed_content=self.read_existing() or default_ini())
             except Exception:
                 pass
 

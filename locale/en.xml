@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Language file for the GameMode GUI.
+
+  Adding a new language: copy this file to locale/<code>.xml, translate the
+  entries and add the code to SUPPORTED_LANGS in core.py. The active language
+  is chosen from (in order): the user's saved choice, the system locale
+  (it/en, otherwise English).
+-->
+<translations lang="en" name="English">
+  <!-- ===== Window / header ===== -->
+  <entry id="window.title">GameMode GUI</entry>
+  <entry id="header.cancel">Cancel</entry>
+  <entry id="header.test">Test</entry>
+  <entry id="header.test.tooltip">Run daemon and version tests</entry>
+  <entry id="header.help.tooltip">Help</entry>
+  <entry id="header.lang.tooltip">Language</entry>
+
+  <!-- ===== Navigation ===== -->
+  <entry id="nav.back">Back</entry>
+  <entry id="nav.next">Next</entry>
+  <entry id="nav.close">Close</entry>
+
+  <!-- ===== Tabs ===== -->
+  <entry id="tab.general">General</entry>
+  <entry id="tab.gpu">GPU</entry>
+  <entry id="tab.cpu">CPU</entry>
+  <entry id="tab.custom">Custom</entry>
+  <entry id="tab.summary">Summary</entry>
+  <entry id="tab.daemon">Daemon</entry>
+  <entry id="tab.daemon.subtitle">Daemon restart, tests and membership in the gamemode group.</entry>
+
+  <!-- ===== Steps (titles and subtitles) ===== -->
+  <entry id="step.general.title">General</entry>
+  <entry id="step.general.subtitle">Main GameMode settings.</entry>
+  <entry id="step.gpu.title">GPU</entry>
+  <entry id="step.gpu.subtitle">Hardware optimisations (NVIDIA / AMD).</entry>
+  <entry id="step.cpu.title">CPU</entry>
+  <entry id="step.cpu.subtitle">Core pinning and core parking.</entry>
+  <entry id="step.custom.title">Custom scripts</entry>
+  <entry id="step.custom.subtitle">Commands run when GameMode starts and ends.</entry>
+  <entry id="step.summary.title">Summary and confirmation</entry>
+  <entry id="step.summary.subtitle">Preview of the file that will be written.</entry>
+  <entry id="summary.path">Managed override (written by the GUI): {path}</entry>
+  <entry id="summary.base">Installed base (read-only): {path}</entry>
+  <entry id="step.restart.title">Configuration saved</entry>
+
+  <entry id="gpu.banner">Warning: [gpu] optimisations are applied by the daemon only if the file is located at /etc/gamemode.ini (privileged path). Use them at your own risk.</entry>
+
+  <!-- ===== Option widgets ===== -->
+  <entry id="list.add">Add</entry>
+  <entry id="list.remove.tooltip">Remove</entry>
+  <entry id="list.placeholder">New value…</entry>
+  <entry id="choice.unset">— (default)</entry>
+  <entry id="stepper.decrease">Decrease</entry>
+  <entry id="stepper.increase">Increase</entry>
+
+  <!-- ===== Summary / daemon buttons ===== -->
+  <entry id="btn.save">Save</entry>
+  <entry id="btn.save.tooltip">Save the whole configuration (the file is rewritten entirely, defaults included)</entry>
+  <entry id="btn.restore_backup">Restore previous backup</entry>
+  <entry id="btn.restore_orig">Restore original</entry>
+  <entry id="btn.restart_daemon">Restart gamemoded</entry>
+  <entry id="btn.test_daemon">Run daemon tests</entry>
+  <entry id="btn.add_group">Add to the gamemode group</entry>
+  <entry id="daemon.group.title">'gamemode' group</entry>
+  <entry id="daemon.console.title">Console</entry>
+  <entry id="daemon.console.clear">Clear</entry>
+  <entry id="daemon.console.cmd">$ {cmd}</entry>
+
+  <!-- ===== Dialogs ===== -->
+  <entry id="dlg.yes">Yes</entry>
+  <entry id="dlg.no">No</entry>
+  <entry id="dlg.ok">OK</entry>
+  <entry id="dlg.retry">Retry</entry>
+  <entry id="dlg.close">Close</entry>
+  <entry id="dlg.cancel">Cancel</entry>
+  <entry id="dlg.confirm">Confirm</entry>
+
+  <entry id="dlg.help.title">Quick guide</entry>
+  <entry id="dlg.help.body">Managing the gamemode.ini file with privileges.\n\nThis application manages the GameMode configuration file. The [gpu] options are applied by the daemon only when the file resides at /etc/gamemode.ini (privileged path): when you enable GPU options, you will be asked for the administrator password via pkexec.\n\nGameMode reads multiple files in this order: /usr/share/gamemode/gamemode.ini (provided by the package), /etc/gamemode.ini, ~/.config/gamemode.ini and $PWD/gamemode.ini. Values from later files override earlier ones. This GUI writes to /etc/gamemode.ini, the location intended for the administrator's configuration (and one of the two, together with /usr/share, where the [gpu] section takes effect).\n\nTo use renice and core parking you must belong to the 'gamemode' group.</entry>
+
+  <entry id="dlg.unsaved.title">Unsaved changes</entry>
+  <entry id="dlg.unsaved.body">There are unsaved changes. Quit without saving?</entry>
+  <entry id="dlg.unsaved.exit">Quit without saving</entry>
+
+  <entry id="dlg.save_ok">Configuration saved successfully.</entry>
+  <entry id="dlg.save_error.title">Error while saving</entry>
+  <entry id="dlg.save_error.body">The write failed and the previous backup was restored.\n\nDetails: {error}</entry>
+
+  <entry id="dlg.render_error.title">Unable to generate the configuration</entry>
+
+  <entry id="dlg.restore_bak.title">Restore backup</entry>
+  <entry id="dlg.restore_bak.body">Restore the previous configuration (gamemode.ini.bak)?</entry>
+  <entry id="dlg.restore_bak.ok">Previous backup restored.</entry>
+  <entry id="dlg.restore_bak.none">There is no previous backup.</entry>
+
+  <entry id="dlg.restore_orig.title">Restore original</entry>
+  <entry id="dlg.restore_orig.body">Restore the original configuration stored in gamemode.ini.orig?</entry>
+  <entry id="dlg.restore_orig.ok">Original configuration restored.</entry>
+  <entry id="dlg.restore_orig.none">gamemode.ini.orig does not exist.</entry>
+
+  <entry id="dlg.logout.title">Logout required</entry>
+  <entry id="dlg.logout.body">You have been added to the 'gamemode' group. For the change to take effect you must log out and back in. Restarting the daemon alone is not enough.</entry>
+
+  <entry id="dlg.lang.title">Language saved</entry>
+  <entry id="dlg.lang.body">The language will be applied the next time the application starts.</entry>
+
+  <entry id="step.restart.group_in">You are already in the 'gamemode' group.</entry>
+  <entry id="step.restart.group_out">You are not yet in the 'gamemode' group. After adding, a logout/login is required for it to take effect.</entry>
+  <entry id="step.restart.group_missing">The 'gamemode' group does not exist on this system.</entry>
+
+  <!-- ===== Core messages ===== -->
+  <entry id="msg.cmd_not_found">Command not found</entry>
+  <entry id="msg.timeout">Timeout after {timeout}s</entry>
+  <entry id="msg.no_priv_frontend">No privileged frontend available</entry>
+
+  <!-- ===== Language configuration errors ===== -->
+  <entry id="msg.lang.missing_file">Language '{lang}' ignored: missing locale/{lang}.xml file.</entry>
+  <entry id="msg.lang.bad_entry">Invalid language entry ignored: {value}.</entry>
+  <entry id="msg.lang.bad_list">Invalid 'supported_langs' key (expected a list): using the default languages.</entry>
+  <entry id="msg.lang.bad_config">Unable to read settings.json: using the default languages.</entry>
+  <entry id="msg.lang.empty">No valid language found: using English.</entry>
+
+  <!-- ===== Option descriptions ===== -->
+  <entry id="opt.general.reaper_freq">How often (in seconds) GameMode's "reaper" thread checks for exited clients, configuration file changes and CPU/iGPU power balancing. Lower values react sooner but use a bit more CPU; higher values are lighter but less responsive. Default: 5.</entry>
+  <entry id="opt.general.desiredgov">CPU governor set when entering GameMode. "performance" keeps cores at maximum frequency (less stutter and latency); "powersave"/"schedutil" use less power. Requires privileges to write the governor (pkexec).</entry>
+  <entry id="opt.general.defaultgov">CPU governor set when leaving GameMode, instead of the one active before. If left empty, GameMode restores the previous governor. Setting it (e.g. "powersave") avoids being stuck on "performance".</entry>
+  <entry id="opt.general.desiredprof">Platform (ACPI/firmware) profile set when entering: "performance" favours speed, "low-power" favours efficiency, "balanced" is in between. Affects fans, thermal limits and power. Not all systems support it.</entry>
+  <entry id="opt.general.defaultprof">Platform profile restored when leaving GameMode. If left empty, the previous one is restored.</entry>
+  <entry id="opt.general.igpu_desiredgov">CPU governor applied when the integrated GPU is under heavy load (GameMode sets it like the CPU governor). "powersave" favours the GPU when it is the one working. Available values are read from the kernel.</entry>
+  <entry id="opt.general.igpu_power_threshold">Ratio between integrated-GPU power (W) and CPU power (W) above which the iGPU is considered "under load" (typically 0.3–0.5). -1 disables the whole iGPU check (always uses desiredgov).</entry>
+  <entry id="opt.general.softrealtime">Soft real-time scheduler policy (SCHED_ISO): "auto" with 4 or more cores, "on" always, "off" never. Can improve smoothness and latency in games, but only takes effect on kernels that support SCHED_ISO (absent in upstream kernels).</entry>
+  <entry id="opt.general.renice">Nice value (0–20) applied, negated, to game processes: higher = more CPU priority. Improves the game's responsiveness but can slow down the rest of the system. 0 = no change. Requires the "gamemode" group.</entry>
+  <entry id="opt.general.ioprio">I/O priority for game processes: from 0 (highest) to 7 (lowest), or "off" to disable it, "reset" for the default CPU-priority-based behaviour. Higher = fewer loading hitches, but penalises other processes.</entry>
+  <entry id="opt.general.inhibit_screensaver">If enabled, GameMode prevents the screen saver and screen lock from activating while it runs. Avoids interruptions during play; disable it if you prefer to keep screen saving.</entry>
+  <entry id="opt.general.disable_splitlock">If enabled, GameMode disables the CPU "split lock" mitigation while playing. Can reduce performance drops in some games, but lowers protection against certain attacks: enable it knowingly.</entry>
+
+  <entry id="opt.gpu.enable_power_plan.label">Enable GPU power plan editing</entry>
+  <entry id="opt.gpu.apply_gpu_optimisations">Main switch for [gpu] optimisations: enabling it accepts responsibility and lets GameMode apply overclocks and NVIDIA/AMD power states. Without it the other [gpu] options are ignored. It only takes effect with the file at /etc/gamemode.ini (privileged path).</entry>
+  <entry id="opt.gpu.gpu_device">DRM device number of the card to control (usually 0), i.e. the number N in /sys/class/drm/cardN/. Useful only with multiple GPUs, to choose which card to optimise.</entry>
+  <entry id="opt.gpu.nv_powermizer_mode">NVIDIA PowerMizer mode: 0 = Adaptive (balanced), 1 = Prefer Maximum Performance (maximum speed, more power/heat), 2 = Auto. Leave "— (default)" to make no change. Requires the coolbits extension enabled in nvidia-xconfig.</entry>
+  <entry id="opt.gpu.nv_core_clock_mhz_offset">Offset in MHz on the GPU core's maximum clock: positive = faster (overclock), negative = slower (undervolt). 0 restores the default values, -1 (or empty) makes no change. Requires coolbits; values that are too high can cause instability or crashes.</entry>
+  <entry id="opt.gpu.nv_mem_clock_mhz_offset">Offset in MHz on the GPU memory's maximum clock: positive = faster, negative = slower. 0 restores the default values, -1 (or empty) makes no change. Requires coolbits; excessive overclocks can cause graphical artefacts or crashes.</entry>
+  <entry id="opt.gpu.amd_performance_level">AMDGPU performance level (power_dpm_force_performance_level): "low" reduces power and noise, "high" pushes performance to the maximum, "auto" lets the driver decide, "manual" is not supported here. Leave "— (default)" to make no change. Requires a recent AMDGPU module.</entry>
+
+  <entry id="opt.cpu.pin_cores">Pin (lock) the game processes to a specific set of cores, preventing them from migrating across cores: improves the consistency of performance and cache. Select cores with the checkboxes; if you select none, GameMode automatically detects the best cores (P-core/E-core on Intel).</entry>
+  <entry id="opt.cpu.park_cores">Take offline (park) the cores not used by the game: reduces power and heat while keeping the active cores at maximum frequency (useful on CPUs with few fast cores). Requires membership in the 'gamemode' group. On many-core CPUs it can reduce system responsiveness while playing.</entry>
+
+  <entry id="custom.notifications.title">Notifications</entry>
+  <entry id="opt.custom.notify_start.label">Notify on start</entry>
+  <entry id="opt.custom.notify_start">Adds the 'notify-send "GameMode started"' entry when GameMode starts: shows a desktop notification as GameMode activates. Handy to see at a glance when optimisations are on; requires a notification daemon running.</entry>
+  <entry id="opt.custom.notify_end.label">Notify on end</entry>
+  <entry id="opt.custom.notify_end">Adds the 'notify-send "GameMode ended"' entry when GameMode ends: shows a desktop notification as GameMode deactivates.</entry>
+
+  <entry id="opt.custom.start">Commands/scripts run (via /bin/sh) when GameMode starts: one line = one command. Use it to stop services, set variables or launch custom scripts. Entries run in order.</entry>
+  <entry id="opt.custom.end">Commands/scripts run (via /bin/sh) when GameMode ends: one line = one command. Use it to restore whatever you changed on start.</entry>
+  <entry id="opt.custom.script_timeout">Maximum time (in seconds) granted to the start/end scripts: those that do not finish within this time are interrupted. Prevents a stuck script from delaying GameMode activation or deactivation.</entry>
+</translations>

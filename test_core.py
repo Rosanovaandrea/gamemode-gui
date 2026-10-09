@@ -7,10 +7,14 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Isolamento: le impostazioni (lingua) non devono leggere la config reale.
+_CFG_TMP = tempfile.mkdtemp(prefix="gamemodegui_core_")
+os.environ["XDG_CONFIG_HOME"] = _CFG_TMP
+
 import core
 from core import (
     ConfigManager, OPTIONS, OptionSpec,
-    default_ini, default_values, parse_ini, render_ini, tr,
+    default_ini, default_values, parse_ini, render_ini,
     values_from_parsed,
 )
 from core import save_session, load_session
@@ -21,7 +25,7 @@ assert "general" in core.SECTIONS_ORDER
 # ---------------------------------------------------------------------------
 # 0. Definizioni caricate da options.json (data-driven)
 # ---------------------------------------------------------------------------
-assert [c.id for c in core.CATEGORIES] == ["general", "filter", "gpu", "cpu", "custom"]
+assert [c.id for c in core.CATEGORIES] == ["general", "gpu", "cpu", "custom"]
 assert len(OPTIONS) == 25
 for spec in OPTIONS:
     assert spec.description_id and spec.type and spec.widget, spec.id
@@ -121,6 +125,46 @@ assert p_custom["custom"]["start"] == ["notify-send hi", "echo bye"]
 print("== cpu pinning/parking + custom scripts OK")
 
 # ---------------------------------------------------------------------------
+# 3d. Toggle notifiche (value_type "toggle_entry") nella sezione custom
+# ---------------------------------------------------------------------------
+notify_start = core.OPTIONS_BY_ID["custom.notify_start"]
+assert notify_start.type == "toggle_entry"
+assert notify_start.target == "custom.start"
+assert notify_start.entry == 'notify-send "GameMode started"'
+assert core.OPTIONS_BY_ID["custom.notify_end"].target == "custom.end"
+
+nv = default_values()
+assert nv["custom.notify_start"] is False and nv["custom.notify_end"] is False
+assert "notify-send" not in render_ini(nv)      # spenti -> nessuna riga
+
+nv["custom.notify_start"] = True
+nv["custom.start"] = ["/home/andrea/gamemode_Start.sh"]
+nv["custom.notify_end"] = True
+nv["custom.end"] = ["/home/andrea/gamemode_Stop.sh"]
+r_nv = render_ini(nv)
+assert 'start=notify-send "GameMode started"' in r_nv
+assert 'end=notify-send "GameMode ended"' in r_nv
+# La notifica viene scritta PRIMA degli altri script (come nel template).
+assert (r_nv.index('start=notify-send "GameMode started"')
+        < r_nv.index("start=/home/andrea/gamemode_Start.sh"))
+assert (r_nv.index('end=notify-send "GameMode ended"')
+        < r_nv.index("end=/home/andrea/gamemode_Stop.sh"))
+
+# Round-trip: leggendo il file la notifica accende il toggle e sparisce dalla
+# lista (è gestita solo dall'interruttore); ricomponendo si ha lo stesso file.
+with tempfile.TemporaryDirectory() as td:
+    p = os.path.join(td, "gamemode.ini")
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(r_nv)
+    loaded = core.load_values_from_file(p)
+    assert loaded["custom.notify_start"] is True
+    assert loaded["custom.notify_end"] is True
+    assert loaded["custom.start"] == ["/home/andrea/gamemode_Start.sh"]
+    assert loaded["custom.end"] == ["/home/andrea/gamemode_Stop.sh"]
+    assert render_ini(loaded) == r_nv
+print("== toggle notifiche custom OK")
+
+# ---------------------------------------------------------------------------
 # 3c. Base installata + override /etc (merge come il daemon) + commenti
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
@@ -129,13 +173,13 @@ with tempfile.TemporaryDirectory() as td:
     os.makedirs(os.path.dirname(base))
     os.makedirs(os.path.dirname(over))
     with open(base, "w", encoding="utf-8") as fh:
-        fh.write("[general]\n; commento base\nreaper_freq=3\n[filter]\nwhitelist=base1\n")
+        fh.write("[general]\n; commento base\nreaper_freq=3\n[custom]\nstart=base1\n")
     with open(over, "w", encoding="utf-8") as fh:
-        fh.write("[general]\nreaper_freq=7\n[filter]\nwhitelist=over1\n")
+        fh.write("[general]\nreaper_freq=7\n[custom]\nstart=over1\n")
 
     merged = core.load_effective_values(base, over)
     assert merged["general.reaper_freq"] == 7                 # override vince
-    assert merged["filter.whitelist"] == ["base1", "over1"]   # liste accodate
+    assert merged["custom.start"] == ["base1", "over1"]       # liste accodate
 
     comments = core.load_base_comments(base)
     assert comments["general.reaper_freq"].startswith(";")
@@ -148,13 +192,13 @@ with tempfile.TemporaryDirectory() as td:
 print("== base installata + override + commenti OK")
 
 # ---------------------------------------------------------------------------
-# 3. Liste (whitelist/blacklist) come chiavi ripetute
+# 3. Liste (script custom) come chiavi ripetute
 # ---------------------------------------------------------------------------
 values2 = default_values()
-values2["filter.whitelist"] = ["RiseOfTheTombRaider", "glxgears"]
+values2["custom.start"] = ["notify-send start", "echo go"]
 cfg = render_ini(values2)
 p2 = parse_ini(cfg)
-assert p2["filter"]["whitelist"] == ["RiseOfTheTombRaider", "glxgears"]
+assert p2["custom"]["start"] == ["notify-send start", "echo go"]
 print("== liste ripetute OK")
 
 # ---------------------------------------------------------------------------
@@ -182,11 +226,84 @@ with tempfile.TemporaryDirectory() as td:
     print("== commit locale + .orig + .bak + rollback OK")
 
 # ---------------------------------------------------------------------------
-# 5. i18n via XML (it) — configurabile, non hardcoded
+# 5. i18n via XML (it/en) — selezione, normalizzazione e fallback
 # ---------------------------------------------------------------------------
-assert tr("window.title") == "GameMode GUI"
-assert tr("btn.save") == "Salva"
-assert tr("chiave.inesistente") == "chiave.inesistente"  # fallback sul key
+from core import Translator
+
+assert Translator("it").tr("window.title") == "GameMode GUI"
+assert Translator("it").tr("btn.save") == "Salva"
+assert Translator("en").tr("btn.save") == "Save"
+assert Translator("it").tr("chiave.inesistente") == "chiave.inesistente"  # fallback sul key
+
+# Normalizzazione dei codici lingua (accetta it_IT.UTF-8, en-US, ...).
+assert core.supported_lang("it_IT.UTF-8") == "it"
+assert core.supported_lang("en-US") == "en"
+assert core.supported_lang("fr_FR.UTF-8") is None
+assert core.supported_lang("C") is None
+assert core.supported_lang("") is None
+
+# Rilevamento dal locale di sistema: vince la prima variabile impostata;
+# se non è it/en si usa l'inglese.
+os.environ["LC_ALL"] = "it_IT.UTF-8"
+assert core.detect_system_lang() == "it"
+os.environ["LC_ALL"] = "fr_FR.UTF-8"
+assert core.detect_system_lang() == "en"
+del os.environ["LC_ALL"]
+
+# La preferenza salvata dall'utente ha la precedenza su tutto (anche sul locale).
+with tempfile.TemporaryDirectory() as td:
+    os.environ["XDG_CONFIG_HOME"] = td
+    os.environ["LC_ALL"] = "it_IT.UTF-8"
+    assert core.resolve_lang() == "it"
+    assert core.settings_path().startswith(td)
+    core.save_lang("en")
+    assert core.load_saved_lang() == "en"
+    assert core.resolve_lang() == "en"       # la scelta salvata vince
+    core.save_lang("fr")                     # non supportata -> inglese
+    assert core.load_saved_lang() == "en"
+    del os.environ["LC_ALL"]
+
+# Elenco lingue letto dalla configurazione + validazione sui file.
+with tempfile.TemporaryDirectory() as td:
+    os.environ["XDG_CONFIG_HOME"] = td
+
+    # Default (nessun settings.json): italiano + inglese.
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it", "en")
+    assert core.available_langs() == [("it", "Italiano"), ("en", "English")]
+    assert core.lang_label("it") == "Italiano"
+    assert core.lang_label("zz") == "ZZ"      # nessun file/attributo -> codice
+
+    # Lista valida con una lingua senza file -> scartata e segnalata.
+    core.save_settings({"supported_langs": ["it", "en", "de"]})
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it", "en")
+    assert any("de" in m for m in core.describe_lang_errors())
+
+    # Lista fatta solo di lingue senza file -> fallback ai default + errore.
+    core.save_settings({"supported_langs": ["de", "fr"]})
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it", "en")
+    assert core.describe_lang_errors()
+
+    # Tipo sbagliato per supported_langs -> fallback + errore.
+    core.save_settings({"supported_langs": "it"})
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it", "en")
+    assert core.describe_lang_errors()
+
+    # Voci non stringa -> ignorate e segnalate.
+    core.save_settings({"supported_langs": [123, "it"]})
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it",)
+    assert any("123" in m for m in core.describe_lang_errors())
+
+    # settings.json rotto -> fallback ai default + errore.
+    with open(core.settings_path(), "w", encoding="utf-8") as fh:
+        fh.write("{non-json")
+    core.reset_supported_langs()
+    assert core.supported_langs() == ("it", "en")
+    assert core.describe_lang_errors()
 print("== i18n OK")
 
 # ---------------------------------------------------------------------------

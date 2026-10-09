@@ -17,8 +17,8 @@ sul *perché* le abbiamo prese, e su come il codice le riflette.
 - Generazione del file INI con un **approccio dichiarativo tabellare**
   (tabella di `OptionSpec` + renderer), non con `configparser` (che perderebbe
   i commenti). Il file viene sempre ricostruito per intero.
-- Flusso utente a **schede** (Generale / Filtro / GPU / Riepilogo / Daemon) con
-  salvataggio per scheda.
+- Flusso utente a **schede** (Generale / GPU / CPU / Custom / Riepilogo /
+  Daemon) con salvataggio per scheda.
 - Test/utility del daemon e gestione del gruppo utente `gamemode`.
 
 Il repository contiene anche il **codice sorgente C di GameMode** (`gamemode/`),
@@ -108,8 +108,8 @@ come voce JSON in `options.json`, raccolta per categoria. Campi principali:
 ```
 key             nome della chiave INI
 description_id  chiave i18n della descrizione
-value_type      int | float | bool | string | choice | list | enable
-widget          stepper | switch | radio | list | entry
+value_type      int | float | bool | string | choice | list | cores | enable | toggle_entry
+widget          stepper | switch | radio | list | cores | entry
 range           [min, max] per i numerici (null = illimitato)
 choices         valori ammessi per "choice"
 default         valore di default
@@ -117,7 +117,12 @@ special         true se i valori vanno letti dal sistema
 special_source  sorgente dei valori speciali (es. "cpu_governors")
 depends_on      id di un'altra opzione da cui dipende
 comment         commento emesso nel file INI
+target/entry    per "toggle_entry": l'interruttore aggiunge/rimuove `entry` dalla lista `target`
 ```
+
+A livello di categoria, `toggle_card_id` è il titolo (i18n) della card che
+raccoglie le opzioni `toggle_entry` in cima alla scheda (es. le notifiche
+`notify-send` in `[custom]`).
 
 `core.load_categories()` legge il file e costruisce le dataclass `Category` e
 `OptionSpec`; da lì derivano `OPTIONS`, `SECTIONS_ORDER` e la creazione
@@ -171,9 +176,15 @@ dalle ultime scelte anche se il file è stato modificato esternamente.
 ### 2.6 i18n tramite file esterni XML (mai stringhe hardcoded)
 
 **Decisione**: tutte le stringhe visibili passano da `tr("chiave")`, che legge
-da `locale/<lang>.xml`. Oggi esiste solo l'italiano (`locale/it.xml`), ma il
-sistema è configurabile: basta aggiungere un altro file XML e impostare
-`GAMEMODE_LANG` (o lasciarlo rilevare automaticamente dal sistema).
+da `locale/<lang>.xml`. L'elenco delle lingue non è hardcoded: si legge dalla
+chiave `supported_langs` di `~/.config/gamemode-gui/settings.json` (default
+`it`, `en`) e ogni voce è validata sull'esistenza di `locale/<codice>.xml`. Le
+voci non valide (codice errato, file mancante, JSON rotto) vengono ignorate e
+segnalate senza bloccare l'app. Il nome mostrato nel menu viene dall'attributo
+`name` dell'XML. La lingua si sceglie in quest'ordine: scelta salvata
+dall'utente (`lang`, menu nell'header, ha la precedenza su tutto), poi il locale
+di sistema (LC_ALL > LC_MESSAGES > LANG), altrimenti inglese. Per aggiungere una
+lingua: nuovo file XML + codice in `supported_langs`.
 
 Formato:
 ```xml
@@ -188,7 +199,7 @@ Se una chiave manca, `tr()` torna al nome della chiave: nessun crash.
 
 **Decisione** (refactoring richiesto dall'utente): minimizzare i file. Da una
 struttura iniziale a molteplici moduli (`core/` + `ui/` da ~15 file) siamo
-passati a **6 file di codice**:
+passati a **6 moduli Python** (più i dati: `options.json`, `style.css`):
 
 ```
 gamemode-gui/
@@ -198,7 +209,10 @@ gamemode-gui/
 ├── ui.py            tutta l'interfaccia GTK, schede generate dai dati
 ├── widgets.py       widget riutilizzabili (build_widget + componenti, vedi 2.8)
 ├── privileged.py    helper root per /etc
-├── locale/it.xml    traduzioni
+├── fileops.py       scrittura atomica/backup/rollback condivisa (GUI + root)
+├── style.css        stile dell'app (CSS caricato a runtime)
+├── locale/it.xml    traduzioni (italiano)
+├── locale/en.xml    traduzioni (inglese)
 ├── test_core.py     test della logica (senza display)
 └── smoke_test.py    test dell'interfaccia (richiede DISPLAY, usa cartella temp)
 ```
@@ -220,8 +234,7 @@ per non duplicare la costruzione dei widget tra le schede:
   il problema dei menù a tendina (vedi 3.3).
 - **`StepperBox`** — pulsanti **− / +** con etichetta centrale, vincolati a
   `min`/`max`, con supporto a step decimali (per i float).
-- **`ListEditor`** — lista di stringhe (whitelist/blacklist, script custom
-  start/end).
+- **`ListEditor`** — lista di stringhe (script custom start/end).
 - **`CoresEditor`** — checkbox per selezionare i core (pinning CPU); valore =
   lista dei core selezionati.
 - **`OptionRow`** — riga completa: **nome opzione + descrizione** sulla stessa
@@ -279,21 +292,20 @@ orizzontalmente. Corretti con `halign=START`, `hexpand=False`.
 
 ---
 
-## 4. Flusso utente (5 schede)
+## 4. Flusso utente (6 schede)
 
 | Scheda | Contenuto |
 |------|-----------|
 | 1 | **Generale** (`[general]`): governor, profili, renice, ioprio, ecc. |
-| 2 | **Filtro** (`[filter]`): whitelist / blacklist |
-| 3 | **GPU** (`[gpu]`): interruttore "Abilita modifica power plan GPU" + power state NVIDIA/AMD (attivi solo con l'interruttore), con banner di avviso |
-| 4 | **CPU** (`[cpu]`): pinning dei core (checkbox) e parking dei core (switch) |
-| 5 | **Custom** (`[custom]`): script di start/end (liste) + timeout |
-| 6 | **Riepilogo**: anteprima del file completo + Salva, Ripristina backup, Ripristina originale |
-| 7 | **Daemon**: test/riavvio del daemon `gamemoded` + gestione gruppo `gamemode`, con **console simulata** sempre visibile |
+| 2 | **GPU** (`[gpu]`): interruttore "Abilita modifica power plan GPU" + power state NVIDIA/AMD (attivi solo con l'interruttore), con banner di avviso |
+| 3 | **CPU** (`[cpu]`): pinning dei core (checkbox) e parking dei core (switch) |
+| 4 | **Custom** (`[custom]`): card **Notifiche** (due interruttori `toggle_entry` per le notifiche desktop) + script di start/end (liste) + timeout |
+| 5 | **Riepilogo**: anteprima del file completo + Salva, Ripristina backup, Ripristina originale |
+| 6 | **Daemon**: test/riavvio del daemon `gamemoded` + gestione gruppo `gamemode`, con **console simulata** sempre visibile |
 
 Navigazione con `Adw.ViewStack` + `Adw.ViewSwitcher` nell'header: si passa
 liberamente da una scheda all'altra senza ordine forzato. Ogni scheda di
-opzioni (Generale, Filtro, GPU) e il Riepilogo hanno il proprio pulsante
+opzioni (Generale, GPU, CPU, Custom) e il Riepilogo hanno il proprio pulsante
 **Salva**, che riscrive comunque l'intero file; la scheda Daemon non salva.
 Stato delle scelte mantenuto in memoria (solo valori).
 
@@ -336,9 +348,10 @@ Richiesta informativa documentata e conclusa (nessuna implementazione):
   (`$PWD` → `$XDG_CONFIG_HOME` → `/etc` → `/usr/share/gamemode`).
 - Il "local data `$PWD`" è risolto alla **directory di lavoro del daemon**
   (`get_current_dir_name()` in `gamemode-config.c`), non per gioco.
-- Il vero filtro "per programma" è `[filter] whitelist/blacklist` (nomi di
-  eseguibile): solo accettazione/rifiuto dell'attivazione, non valori diversi
-  per gioco.
+- GameMode supporta un filtro "per programma" con `[filter] whitelist/blacklist`
+  (nomi di eseguibile): solo accettazione/rifiuto dell'attivazione, non valori
+  diversi per gioco. Questa GUI **non** lo gestisce (scheda Filtro rimossa):
+  eventuali voci `[filter]` non vengono lette né riscritte.
 - Esiste l'API supervisore (`gamemode_request_start_for`) per richieste
   programmatiche per-PID da un launcher custom.
 - Il modo pratico per attivare GameMode su un singolo gioco è
@@ -353,10 +366,10 @@ l'impostazione che GameMode supporta nativamente.
 ## 8. Stato di avanzamento / possibile lavoro futuro
 
 Fatto:
-- [x] Tabella dichiarativa completa (`[general]`, `[filter]`, `[gpu]`)
+- [x] Tabella dichiarativa completa (`[general]`, `[gpu]`, `[cpu]`, `[custom]`)
 - [x] Unico file in `/etc` con helper privilegiato (pkexec/sudo)
 - [x] Scrittura atomica + backup + rollback + `.orig`
-- [x] i18n via XML (italiano, configurabile)
+- [x] i18n via XML (italiano e inglese, elenco lingue dalla config)
 - [x] Stato di sessione persistito su JSON
 - [x] Widget riutilizzabili (radio picker, stepper, list editor)
 - [x] Interfaccia a schede con salvataggio per scheda, test utility, gruppo utente
