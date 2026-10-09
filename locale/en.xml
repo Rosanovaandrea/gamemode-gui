@@ -3,9 +3,9 @@
   Language file for the GameMode GUI.
 
   Adding a new language: copy this file to locale/<code>.xml, translate the
-  entries and add the code to SUPPORTED_LANGS in core.py. The active language
-  is chosen from (in order): the user's saved choice, the system locale
-  (it/en, otherwise English).
+  entries and add the code to "supported_langs" in settings.json (default: it,
+  en). The active language is chosen from (in order): the user's saved choice,
+  the system locale (it/en, otherwise English).
 -->
 <translations lang="en" name="English">
   <!-- ===== Window / header ===== -->

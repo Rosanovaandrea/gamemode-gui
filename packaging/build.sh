@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Costruisce il pacchetto .deb e .rpm della GUI di GameMode.
+# Build the .deb and .rpm packages of the GameMode GUI.
 #
-# Uso:
+# Usage:
 #   packaging/build.sh
 #
-# Requisiti per il .deb: dpkg-deb (pacchetto dpkg-dev/dpkg).
-# Requisiti per l'.rpm: rpmbuild (pacchetto rpm-build). Se non è nel PATH, si
-# può indicare un binario alternativo con RPMBUILD e la sua config dir con
-# RPMCONF, es.:
+# Requirements for the .deb: dpkg-deb (package dpkg-dev/dpkg).
+# Requirements for the .rpm: rpmbuild (package rpm-build). If it is not in the
+# PATH, an alternative binary can be given with RPMBUILD and its config dir with
+# RPMCONF, e.g.:
 #   RPMBUILD=/path/usr/bin/rpmbuild RPMCONF=/path/rpmconf packaging/build.sh
 set -euo pipefail
 
@@ -23,7 +23,7 @@ rm -rf "$WORK"
 mkdir -p "$WORK" "$DIST_DIR"
 
 # ---------------------------------------------------------------------------
-# Tarball sorgente (usato dall'RPM)
+# Source tarball (used by the RPM)
 # ---------------------------------------------------------------------------
 SRCDIR="$WORK/$NAME-$VERSION"
 mkdir -p "$SRCDIR/locale" "$SRCDIR/packaging"
@@ -40,7 +40,7 @@ tar -C "$WORK" -czf "$WORK/$NAME-$VERSION.tar.gz" "$NAME-$VERSION"
 # ---------------------------------------------------------------------------
 build_deb() {
     command -v dpkg-deb >/dev/null 2>&1 || {
-        echo "!! dpkg-deb assente: salto il .deb" >&2; return 0; }
+        echo "!! dpkg-deb missing: skipping the .deb" >&2; return 0; }
 
     local tree="$WORK/deb"
     rm -rf "$tree"
@@ -87,11 +87,11 @@ EOF
 #!/bin/sh
 set -e
 
-# --- RESET configurazione (comportamento temporaneo) -------------------------
-# All'installazione/aggiornamento azzera la configurazione gestita dalla GUI:
-#   * /etc/gamemode.ini e i suoi file di servizio (.orig/.bak/.tmp/.session.json)
-#   * le preferenze utente (~/.config/gamemode-gui/settings.json)
-# Così la nuova versione riparte sempre da uno stato pulito.
+# --- Configuration RESET (temporary behaviour) -------------------------------
+# On install/upgrade, wipe the configuration managed by the GUI:
+#   * /etc/gamemode.ini and its service files (.orig/.bak/.tmp/.session.json)
+#   * the user preferences (~/.config/gamemode-gui/settings.json)
+# So the new version always starts from a clean state.
 rm -f /etc/gamemode.ini /etc/gamemode.ini.orig /etc/gamemode.ini.bak \
       /etc/gamemode.ini.tmp /etc/gamemode.ini.session.json
 for home in /root /home/*; do
@@ -99,7 +99,7 @@ for home in /root /home/*; do
     rm -f "$home/.config/gamemode-gui/settings.json"
 done
 
-# --- Cache desktop / icone ---------------------------------------------------
+# --- Desktop / icon cache ----------------------------------------------------
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q /usr/share/applications || true
 fi
@@ -121,7 +121,7 @@ EOF
     chmod 755 "$tree/DEBIAN/postinst" "$tree/DEBIAN/postrm"
     dpkg-deb --root-owner-group --build "$tree" \
         "$DIST_DIR/${NAME}_${VERSION}-${RELEASE}_all.deb"
-    echo "== DEB creato: $DIST_DIR/${NAME}_${VERSION}-${RELEASE}_all.deb"
+    echo "== DEB created: $DIST_DIR/${NAME}_${VERSION}-${RELEASE}_all.deb"
 }
 
 # ---------------------------------------------------------------------------
@@ -132,8 +132,8 @@ build_rpm() {
     mkdir -p "$top/BUILD" "$top/RPMS" "$top/SOURCES" "$top/SPECS" "$top/SRPMS" "$top/BUILDROOT"
     install -m 644 "$WORK/$NAME-$VERSION.tar.gz" "$top/SOURCES/"
     install -m 644 "$HERE/gamemode-gui.spec" "$top/SPECS/gamemode-gui.spec"
-    # Allinea la Version/Release dello spec a quelle usate per il tarball
-    # (così il tag git, il nome del tarball e la versione RPM coincidono).
+    # Align the spec Version/Release with those used for the tarball
+    # (so the git tag, the tarball name and the RPM version match).
     sed -i "s/^Version:.*/Version:        $VERSION/" "$top/SPECS/gamemode-gui.spec"
     sed -i "s/^Release:.*/Release:        ${RELEASE}%{?dist}/" "$top/SPECS/gamemode-gui.spec"
 
@@ -143,22 +143,22 @@ build_rpm() {
     elif [ -n "${RPMBUILD:-}" ]; then
         cmd=("$RPMBUILD")
         [ -n "${RPMCONF:-}" ] && cmd+=(--define "_rpmconfigdir $RPMCONF")
-        # Con un rpmbuild "portatile" gli script brp/check-buildroot non sono
-        # in /usr/lib/rpm: per un pacchetto noarch Python li saltiamo.
+        # With a "portable" rpmbuild the brp/check-buildroot scripts are not in
+        # /usr/lib/rpm: for a noarch Python package we skip them.
         cmd+=(--define "__os_install_post %{nil}" --define "__arch_install_post %{nil}")
     else
-        echo "!! rpmbuild assente: salto l'.rpm (installa rpm-build o imposta RPMBUILD/RPMCONF)" >&2
+        echo "!! rpmbuild missing: skipping the .rpm (install rpm-build or set RPMBUILD/RPMCONF)" >&2
         return 0
     fi
 
     "${cmd[@]}" --define "_topdir $top" -bb "$top/SPECS/gamemode-gui.spec"
     find "$top/RPMS" -name '*.rpm' -exec cp {} "$DIST_DIR/" \;
-    echo "== RPM creato in: $DIST_DIR"
+    echo "== RPM created in: $DIST_DIR"
 }
 
 build_deb
 build_rpm
 
 echo
-echo "Contenuto di $DIST_DIR:"
+echo "Contents of $DIST_DIR:"
 ls -l "$DIST_DIR"/*.deb "$DIST_DIR"/*.rpm 2>/dev/null || true

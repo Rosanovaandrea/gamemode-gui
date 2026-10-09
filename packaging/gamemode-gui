@@ -1,5 +1,5 @@
 #!/bin/sh
-# Launcher della GUI di GameMode.
-# I file dell'applicazione sono installati in /usr/share/gamemode-gui.
+# Launcher of the GameMode GUI.
+# The application files are installed in /usr/share/gamemode-gui.
 GAMEMODE_GUI_DIR="${GAMEMODE_GUI_DIR:-/usr/share/gamemode-gui}"
 exec python3 "$GAMEMODE_GUI_DIR/main.py" "$@"

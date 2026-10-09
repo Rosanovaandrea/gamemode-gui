@@ -1,18 +1,18 @@
-"""Operazioni atomiche sui file di configurazione, condivise.
+"""Atomic configuration-file operations, shared.
 
-Nessuna dipendenza da ``core.py`` o da GTK: questo modulo può essere importato
-sia dalla GUI (percorso locale scrivibile) sia dall'helper privilegiato
-``privileged.py`` (eseguito come root via pkexec/sudo).
+No dependency on ``core.py`` or GTK: this module can be imported both by the GUI
+(local writable path) and by the privileged helper ``privileged.py`` (run as root
+via pkexec/sudo).
 
-Strategia "copy on write" per un commit sicuro:
-    1. contenuto nuovo su ``<target>.tmp`` + ``fsync``;
-    2. ``<target>.orig`` = copia "vergine" iniziale (creata una sola volta);
-    3. ``<target>.bak`` = copia del file attivo precedente al commit;
-    4. ``os.replace(tmp, target)`` (atomico su POSIX);
-    5. su errore al passo 4: rollback automatico dal ``.bak``.
+"Copy on write" strategy for a safe commit:
+    1. new content to ``<target>.tmp`` + ``fsync``;
+    2. ``<target>.orig`` = initial "pristine" copy (created only once);
+    3. ``<target>.bak`` = copy of the active file before the commit;
+    4. ``os.replace(tmp, target)`` (atomic on POSIX);
+    5. on error at step 4: automatic rollback from ``.bak``.
 
-Le funzioni sono pure rispetto allo stato dell'app (nessuna classe): chi le usa
-decide *dove* scrivere, qui c'è solo il *come* scrivere in modo sicuro.
+The functions are pure with respect to the app state (no class): the caller
+decides *where* to write, here there is only *how* to write safely.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import tempfile
 
 
 def _write_ephemeral(content: str) -> str:
-    """Scrive ``content`` su un file temporaneo e ne restituisce il percorso."""
+    """Write ``content`` to a temporary file and return its path."""
     fd, path = tempfile.mkstemp(prefix="gamemode-orig-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -38,12 +38,12 @@ def _write_ephemeral(content: str) -> str:
 
 def ensure_orig(target: str, seed_content: str | None = None,
                 fallback_path: str | None = None) -> None:
-    """Crea ``<target>.orig`` se non esiste ancora (una sola volta in assoluto).
+    """Create ``<target>.orig`` if it does not exist yet (once and for all).
 
-    Ordine di priorità per il contenuto "vergine":
-      1. il file attivo ``target`` se esiste;
-      2. ``seed_content`` (contenuto fornito dal chiamante);
-      3. ``fallback_path`` (es. il ``.tmp`` appena scritto).
+    Priority order for the "pristine" content:
+      1. the active file ``target`` if it exists;
+      2. ``seed_content`` (content provided by the caller);
+      3. ``fallback_path`` (e.g. the ``.tmp`` just written).
     """
     orig = target + ".orig"
     if os.path.exists(orig):
@@ -72,10 +72,10 @@ def ensure_orig(target: str, seed_content: str | None = None,
 
 def write_commit(target: str, content: str, orig_seed_content: str | None = None,
                  create_dirs: bool = False) -> None:
-    """Esegue un commit atomico di ``content`` su ``target``.
+    """Perform an atomic commit of ``content`` to ``target``.
 
-    Se ``create_dirs`` è True crea la cartella di destinazione (percorsi utente
-    tipo ``~/.config``); per ``/etc`` la cartella esiste già.
+    If ``create_dirs`` is True, create the destination folder (user paths such as
+    ``~/.config``); for ``/etc`` the folder already exists.
     """
     if create_dirs:
         directory = os.path.dirname(target) or "."
@@ -88,7 +88,7 @@ def write_commit(target: str, content: str, orig_seed_content: str | None = None
         os.fsync(fh.fileno())
     os.chmod(tmp, 0o644)
 
-    # Un seed vuoto equivale a "nessun seed": si usa il contenuto appena scritto.
+    # An empty seed is equivalent to "no seed": use the content just written.
     ensure_orig(target, seed_content=(orig_seed_content or None), fallback_path=tmp)
 
     had_previous = os.path.isfile(target)
@@ -112,18 +112,18 @@ def write_commit(target: str, content: str, orig_seed_content: str | None = None
 
 
 def restore_from_backup(target: str) -> None:
-    """Ripristina ``<target>.bak`` -> ``target``."""
+    """Restore ``<target>.bak`` -> ``target``."""
     backup = target + ".bak"
     if not os.path.isfile(backup):
-        raise FileNotFoundError("nessun backup disponibile")
+        raise FileNotFoundError("no backup available")
     shutil.copy2(backup, target)
     os.chmod(target, 0o644)
 
 
 def restore_from_orig(target: str) -> None:
-    """Ripristina ``<target>.orig`` -> ``target``."""
+    """Restore ``<target>.orig`` -> ``target``."""
     orig = target + ".orig"
     if not os.path.isfile(orig):
-        raise FileNotFoundError("nessun originale disponibile")
+        raise FileNotFoundError("no original available")
     shutil.copy2(orig, target)
     os.chmod(target, 0o644)

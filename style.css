@@ -1,26 +1,26 @@
-/* Stile dell'applicazione GameMode GUI.
+/* GameMode GUI application style.
  *
- * Caricato da ui.install_app_css() (a priorità APPLICATION sul display), così
- * può sovrascrivere lo stile del tema. I colori @accent_* sono quelli del tema
- * di sistema (lo stesso arancio/blu dei pulsanti principali).
+ * Loaded by ui.install_app_css() (at APPLICATION priority on the display), so it
+ * can override the theme style. The @accent_* colours come from the system theme
+ * (the same orange/blue as the main buttons).
  */
 
-/* Console simulata della scheda Daemon: aspetto da terminale. */
+/* Simulated console of the Daemon tab: terminal-like look. */
 .console, .console text {
   background-color: #16181d;
   color: #e6e6e6;
   font-family: monospace;
 }
 
-/* Opzione attiva: la scelta selezionata nei gruppi radio, con sfondo d'accento
- * e testo chiaro (stile "segmenti" di GNOME). */
+/* Active option: the selected choice in radio groups, with accent background
+ * and light text (GNOME "segmented" style). */
 .choice-button:checked {
   background-color: @accent_bg_color;
   background-image: none;
   color: @accent_fg_color;
 }
 
-/* Testi "+" e "−" degli stepper numerici nel colore d'accento. */
+/* "+" and "−" texts of the numeric steppers in the accent colour. */
 .stepper-button {
   color: @accent_color;
 }

@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Entry point della GUI di GameMode.
+"""Entry point of the GameMode GUI.
 
-L'applicazione è divisa in pochi file, come richiesto nel refactoring:
+The application is split into a few files, as required by the refactoring:
 
-    main.py        → questo file: avvia l'applicazione (delega a ui.main())
-    options.json   → tutte le opzioni per categoria (data-driven)
-    presentation.json → contenuti della scheda Presentazione (data-driven)
-    core.py        → tutta la logica (definizioni, valori speciali, renderer,
-                     config, i18n, utility)
-    ui.py          → tutta l'interfaccia GTK (schede generate dai dati)
-    widgets.py     → widget riutilizzabili (build_widget + componenti)
-    privileged.py  → helper eseguito come root per scrivere in /etc
-    fileops.py     → scrittura atomica/backup/rollback (GUI + root)
-    style.css      → stile dell'app (CSS caricato a runtime)
-    locale/<lang>.xml → traduzioni (italiano e inglese)
+    main.py        -> this file: starts the application (delegates to ui.main())
+    options.json   -> all options per category (data-driven)
+    presentation.json -> content of the Presentation tab (data-driven)
+    core.py        -> all the logic (definitions, special values, renderer,
+                      config, i18n, utilities)
+    ui.py          -> the whole GTK interface (tabs generated from the data)
+    widgets.py     -> reusable widgets (build_widget + components)
+    privileged.py  -> helper run as root to write into /etc
+    fileops.py     -> atomic write/backup/rollback (GUI + root)
+    style.css      -> app style (CSS loaded at runtime)
+    locale/<lang>.xml -> translations (Italian and English)
 
-Lanciare con:  python3 main.py
-Per i test forzare un percorso scrivibile:
-    GAMEMODE_CONFIG=/tmp/prova/gamemode.ini python3 main.py
+Run with:  python3 main.py
+For tests force a writable path:
+    GAMEMODE_CONFIG=/tmp/try/gamemode.ini python3 main.py
 """
 
 from __future__ import annotations

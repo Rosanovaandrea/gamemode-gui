@@ -16,9 +16,9 @@ Requires:       gamemode
 Requires:       polkit
 Recommends:     sudo
 
-# Pacchetto noarch di soli script/dati Python: non servono le elaborazioni
-# post-install (strip, bytecompile, mangle-shebang). Evita dipendenze dal brp
-# e rende la build riproducibile anche dove gli helper rpm non sono completi.
+# Noarch package made only of Python scripts/data: no post-install processing
+# (strip, bytecompile, mangle-shebang) is needed. Avoids brp dependencies and
+# keeps the build reproducible even where the rpm helpers are incomplete.
 %global __os_install_post %{nil}
 %global __arch_install_post %{nil}
 
@@ -33,7 +33,7 @@ pinning/parking and GPU optimisations.
 %setup -q
 
 %build
-# Nessuna compilazione: pacchetto Python/GTK puro.
+# No compilation: pure Python/GTK package.
 
 %install
 rm -rf %{buildroot}
@@ -58,10 +58,10 @@ install -d %{buildroot}%{_datadir}/licenses/%{name}
 install -m 644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 
 %post
-# --- RESET configurazione (comportamento temporaneo) -------------------------
-# All'installazione/aggiornamento azzera la configurazione gestita dalla GUI:
-#   * /etc/gamemode.ini e i suoi file di servizio (.orig/.bak/.tmp/.session.json)
-#   * le preferenze utente (~/.config/gamemode-gui/settings.json)
+# --- Configuration RESET (temporary behaviour) -------------------------------
+# On install/upgrade, wipe the configuration managed by the GUI:
+#   * /etc/gamemode.ini and its service files (.orig/.bak/.tmp/.session.json)
+#   * the user preferences (~/.config/gamemode-gui/settings.json)
 rm -f /etc/gamemode.ini /etc/gamemode.ini.orig /etc/gamemode.ini.bak \
       /etc/gamemode.ini.tmp /etc/gamemode.ini.session.json
 for home in /root /home/*; do

@@ -12,6 +12,7 @@ sul *perché* le abbiamo prese, e su come il codice le riflette.
 
 ## 1. Contesto e obiettivo
 
+<<<<<<< HEAD
 - Gestire **tutte** le opzioni di `gamemode.ini` da una GUI.
 - Strategia di scrittura **sicura**: backup, rollback, reset, scrittura atomica.
 - Generazione del file INI con un **approccio dichiarativo tabellare**
@@ -25,6 +26,22 @@ Il repository contiene anche il **codice sorgente C di GameMode** (`gamemode/`),
 usato come riferimento: il progetto GUI resta però **staccato** — non è un fork,
 non compila niente di gamemode; si limita a generare e gestire il file di
 configurazione.
+=======
+- **Project**: a desktop GUI (GTK4 + Libadwaita, Python 3) to manage the
+  `gamemode.ini` configuration file of the **Feral GameMode** daemon.
+- **Repository layout**:
+  - `gamemode/` — the upstream **C source of GameMode**, used only as a reference
+    (not a fork; nothing of it is compiled). It documents the config locations, the
+    `[gpu]` "protected" rules and the CLI of the daemon.
+  - `gamemode-gui/` — the application itself (this repo).
+- **Goal**: manage **all** `gamemode.ini` options from a GUI, with a **safe write
+  strategy** (atomic commit, backup, rollback, restore), a **declarative/tabular**
+  INI generation (no `configparser`, so comments are preserved), a **tabbed** user
+  flow, and daemon utilities (test, restart, `gamemode` group).
+- **Codebase language**: source code, comments, docstrings, `README.md` and this
+  file are in **English**. Only the translation data (`locale/*.xml`) and the
+  desktop entry's localised fields (`Comment[it]`) are in other languages.
+>>>>>>> 1b8b488 (English codebase (comments/docstrings) + refactoring)
 
 ---
 
@@ -218,8 +235,14 @@ gamemode-gui/
 └── smoke_test.py    test dell'interfaccia (richiede DISPLAY, usa cartella temp)
 ```
 
+<<<<<<< HEAD
 `ui.py` è organizzata in "capitoli" numerati (1..8), con le schede come unità
 principali, così è facile navigare il file.
+=======
+`ui.py` is organised in numbered "chapters" (1..8, plus a 5b for the Presentation
+tab), with the tabs as the main units, so the file is easy to navigate. `core.py`
+is pure logic (no GTK), fully testable without a display.
+>>>>>>> 1b8b488 (English codebase (comments/docstrings) + refactoring)
 
 ### 2.8 Widget riutilizzabili in `widgets.py`
 
@@ -252,8 +275,140 @@ Tutti espongono la stessa interfaccia valori: `get_value()`, `set_value()`,
 più i valori speciali `off` (disabilita) e `reset` (ripristina il comportamento
 predefinito basato sulla priorità CPU).
 
+<<<<<<< HEAD
 Il file scrive letteralmente `ioprio=reset` (e `ioprio=off`), coerente con la
 descrizione mostrata all'utente e con il commento di `example/gamemode.ini`.
+=======
+Current categories/options (25 options across 4 sections):
+`[general]` (12), `[gpu]` (6), `[cpu]` (2), `[custom]` (5, including the two
+`toggle_entry` notification switches).
+
+### 2.3 Special values read from the system
+
+Some options have `"special": true` and a `special_source`:
+
+- **CPU governor** (`general.desiredgov`, `general.defaultgov`,
+  `general.igpu_desiredgov`): `get_cpu_governors()` reads
+  `/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_governors` (**all** CPUs,
+  deduplicated) with a static fallback. Note: GameMode applies `igpu_desiredgov`
+  through the same `cpugovctl` as the CPU governor, so it is the same value domain.
+- **CPU cores** (`cpu.pin_cores`): `get_cpu_cores()` reads
+  `/sys/devices/system/cpu/online` (fallback: `os.cpu_count()`).
+
+`core.resolve_choices()` resolves the list from the system; the widget stays
+standard (`ChoicePicker`), except pinning which uses `CoresEditor` (checkboxes).
+Adding a `special_source` = adding a function to `SPECIAL_SOURCES`.
+
+### 2.4 Presentation — `presentation.json`
+
+The Presentation tab is not options: it is a text page split into blocks. The
+**structure** (which blocks, in what order, which are warnings) lives in
+`presentation.json`; the **texts** live in the language files. Adding a block =
+one JSON entry + i18n keys. Current blocks: *What is GameMode*, *Why GameMode GUI*,
+*Launching a game with gamemoderun*, *Steam*, *Lutris*, *Disclaimer* (warning card
+with icon).
+
+### 2.5 Config management + privileged helper
+
+**Single file `/etc/gamemode.ini`**: the daemon loads 4 files and merges them
+(`gamemode-config.c`): `/usr/share/gamemode/gamemode.ini` (protected),
+`/etc/gamemode.ini` (protected), `~/.config/gamemode.ini` and `$PWD/gamemode.ini`
+(unsafe). Lists are appended, scalars override → last read wins. The `[gpu]`
+section is accepted **only** in the "protected" locations, so the GUI writes to
+`/etc` (not `/usr/share`, which belongs to the package).
+
+- **Base**: `core.resolve_base_path()` detects the installed file
+  (`$XDG_DATA_DIRS`/`/usr/local/share`/`/usr/share`, forceable with
+  `GAMEMODE_BASE`); the shown values are the **effective** ones (base + `/etc`
+  merge), and the comments of the `/etc` entries come from the installed file.
+- **Atomic commit** ("copy on write"): `.tmp` + `fsync` → `.bak` of the previous
+  active file → `os.replace` (atomic) → `.orig` (pristine, created once) → on
+  error, automatic rollback from `.bak`.
+- **`fileops.py`** holds this logic once; it is used by **both** the local path
+  (`core.ConfigManager`, writable paths / tests) **and** the privileged helper.
+- **`privileged.py`** is a standalone command (no import of the app), run as root
+  via `pkexec` (fallback `sudo -n`); it handles `commit`/`restore-backup`/
+  `restore-orig`/`ensure-orig` and reads stdin for the new content (and an optional
+  seed path).
+
+### 2.6 Active options, dependencies and session
+
+- **Only active options are written**: an option is written only if its value
+  differs from the default (or a list is non-empty). Defaults are not written
+  because GameMode applies them itself; a file with all defaults equals an empty
+  file.
+- **Dependencies**: `[gpu]` options have `depends_on: gpu.apply_gpu_optimisations`;
+  the GPU tab has an **"Enable GPU power plan editing"** switch that writes
+  `apply_gpu_optimisations=accept-responsibility`. When it is off, the other
+  `[gpu]` entries are disabled in the UI and not written.
+- **Session**: at commit, the current values are also saved to
+  `gamemode.ini.session.json` next to the active file, so the UI can start from the
+  last choices even if the file was changed externally. `core.coerce_value()`
+  converts JSON values back to the spec type.
+
+### 2.7 i18n and language selection
+
+- All visible strings go through `tr("key")`, which reads `locale/<lang>.xml`.
+  XML texts may use `\n` for line breaks (converted on load).
+- The list of available languages is **not hardcoded**: it is read from
+  `supported_langs` in `~/.config/gamemode-gui/settings.json` (default `it`, `en`)
+  and each entry is validated against the existence of `locale/<code>.xml`. Invalid
+  entries are ignored and reported (non-blocking). The menu label comes from the
+  XML `name` attribute.
+- Language resolution order: **saved user choice** (`lang` in `settings.json`, set
+  from the header menu; wins over everything) → **system locale**
+  (`LC_ALL > LC_MESSAGES > LANG`, only `it`/`en`) → **English**.
+- The settings file is created on first run; missing/broken entries fall back to
+  safe defaults without blocking the app.
+
+### 2.8 Reusable widgets — `widgets.py`
+
+- **`build_widget`** — single point that maps `value_type`/`widget` to the right GTK
+  control; no per-option code.
+- **`ChoicePicker`** — **no dropdown**: a group of radio buttons in a FlowBox
+  (selected item highlighted with the accent colour, GNOME "segmented" style).
+- **`StepperBox`** — `−`/`+` buttons with a central label, bounded by `min`/`max`,
+  decimal steps for floats (the `+`/`−` texts use the accent colour).
+- **`SwitchBox`** — on/off switch with the same value interface as the others (also
+  used for `enable`/`toggle_entry`).
+- **`ListEditor`** — list of strings (custom start/end scripts).
+- **`CoresEditor`** — checkboxes to select CPU cores (pinning); value = selected
+  cores.
+- **`OptionRow`** — full row: *name + description* on the same line and the control
+  below; no per-type special-casing (uniform `get_value`/`set_value`).
+
+All expose the same value interface: `get_value()`, `set_value()`,
+`set_sensitive()`, `on_change` callback.
+
+### 2.9 UI tabs
+
+`Adw.ViewStack` + `Adw.ViewSwitcher` in the header; free navigation, no forced
+order. The Presentation tab opens by default.
+
+| # | Tab | Content |
+|---|-----|---------|
+| 1 | **Presentation** (default) | What GameMode is, why the GUI, `gamemoderun`/Steam/Lutris, disclaimer. Data-driven from `presentation.json` + i18n |
+| 2 | **General** (`[general]`) | governor, profiles, renice, ioprio, iGPU, etc. |
+| 3 | **GPU** (`[gpu]`) | "Enable GPU power plan editing" switch + NVIDIA/AMD power state (active only with the switch), with a warning banner |
+| 4 | **CPU** (`[cpu]`) | core pinning (checkboxes) and core parking (switch) |
+| 5 | **Custom** (`[custom]`) | **Notifications** card (two `toggle_entry` switches) + start/end scripts (lists) + timeout |
+| 6 | **Summary** | preview of the full file + Save, Restore backup, Restore original |
+| 7 | **Daemon** | daemon test/restart + `gamemode` group management, with an always-visible **simulated console** |
+
+Each options tab and the Summary have their own **Save** button that rewrites the
+whole file; the Daemon tab does not save. After a save, a dialog reminds the user to
+**restart the daemon** (Daemon tab) for the changes to take effect.
+>>>>>>> 1b8b488 (English codebase (comments/docstrings) + refactoring)
+
+### 2.10 Type rules — single dispatch table
+
+The type-specific logic — how a value is rendered to INI, whether it is written,
+how it is parsed from INI and how it is coerced from the JSON session — is
+centralised in a single dispatch table `TYPE_RULES` (`core.py`), keyed by
+`value_type`. Each entry is a `TypeRules` object with four callables: `render`,
+`is_written`, `parse_ini`, `coerce_json`. `render_option()`, `is_written()`,
+`values_from_parsed()` and `coerce_value()` all dispatch through `_rules(spec)`,
+so adding or changing a value type is a one-place change.
 
 ---
 
@@ -270,6 +425,7 @@ descrizione mostrata all'utente e con il commento di `example/gamemode.ini`.
 
 ### 3.2 Crash al "Riavvia gamemoded"
 
+<<<<<<< HEAD
 `dlg.present(self)`: in GTK4 `Gtk.Window.present()` **non accetta argomenti**.
 Corretti tutti i `present(self)` → `present()`.
 
@@ -290,6 +446,24 @@ una modifica attiva automaticamente il flag.
 
 Gli `Gtk.Switch` come figli di un `Box` verticale venivano stirati
 orizzontalmente. Corretti con `halign=START`, `hexpand=False`.
+=======
+- Binaries (`gamemoded`, `systemctl`, `usermod`, `pkexec`, `sudo`, `pkill`) are
+  resolved to **absolute paths** (`shutil.which` + known fallbacks), so they work
+  even with a minimal PATH (e.g. under `pkexec`) or different layouts (`/usr/sbin`
+  vs `/sbin`, merged-usr).
+- The version is read from **`gamemoded --version`** (NOT `gamemoderun --version`:
+  `gamemoderun` is a script that execs the passed command and does not handle
+  `--version`).
+- `CommandResult.command` records the command actually run, and the Daemon console
+  shows it (useful to diagnose distro differences).
+- Debian separates the daemon into `gamemode-daemon`; the `.deb` `Depends` is
+  `gamemode-daemon | gamemode` (compatible with older single-package Debian too).
+- CPU governors are read from all `.../cpu*/cpufreq/scaling_available_governors`.
+- `run_privileged()` (config writes) and the daemon helpers (`test_daemon`,
+  `daemon_version`, `restart_daemon`, `add_user_to_group`) all return the same
+  `CommandResult` type (success, returncode, stdout/stderr, error, command), so
+  callers handle results uniformly.
+>>>>>>> 1b8b488 (English codebase (comments/docstrings) + refactoring)
 
 ---
 
@@ -354,6 +528,7 @@ Tutti i comandi usano liste di argomenti (`subprocess`), mai `shell=True`.
 
 ## 6. Testing
 
+<<<<<<< HEAD
 - **`test_core.py`** (senza display): renderer/roundtrip, liste ripetute,
   commit locale atomico + `.orig`/`.bak`/rollback, i18n XML, sessione JSON,
   `privileged.py` in locale.
@@ -362,6 +537,29 @@ Tutti i comandi usano liste di argomenti (`subprocess`), mai `shell=True`.
   verifica `.orig` e `.session.json` creati e che il file sia completo.
 - L'app va lanciata con `python3 main.py`; per i test su percorso scrivibile:
   `GAMEMODE_CONFIG=/tmp/prova/gamemode.ini python3 main.py`.
+=======
+Chronological summary (oldest first) of how the current state was reached:
+
+| Commit | Date | What it introduced |
+|--------|------|--------------------|
+| `1ba9267` | 2026-09-30 | Initial GameMode GUI implementation per spec |
+| `b3ccb06` | 2026-09-30 | Refactor: single `/etc` file, privileged helper, XML i18n, session state, few files |
+| `767bc94` | 2026-09-30 | Fix: always-editable inputs (active dropdowns), natural-size switches, `present()` without args |
+| `b90edba` | 2026-10-01 | Reusable widgets: `ChoicePicker` radio buttons (no dropdown), `StepperBox` -/+; `ioprio` as int |
+| `8ed0c7d` | 2026-10-01 | Added `agents.md` (work summary and architectural choices) |
+| `ebe54f0` | 2026-10-03 | Data-driven tabbed GUI (`options.json`), installed base + `/etc` override, CPU/Custom, deb/rpm packaging |
+| `159d563` | 2026-10-09 | Saved language + English file, Filter tab removed, Custom notification toggles, accent styling, refactoring (`fileops.py`, `coerce_value`, `OPTIONS_BY_SECTION`, `SwitchBox`, `style.css`), improved descriptions |
+| `4e24e29` | 2026-10-09 | Data-driven Presentation tab (default at startup) + daemon-restart notice on save; `\n` → newline fix |
+| `8e460b2` | 2026-10-09 | Packaging: reset on install, GitHub Actions CI/CD release, Debian/RPM command portability |
+| `08c4b44` | 2026-10-09 | Docs: single English `README.md` (with the Presentation content) + `agents.md` as the system state |
+| (this commit) | 2026-10-09 | English codebase (comments/docstrings) + refactoring: type-rules dispatch table, uniform `CommandResult`, unified restore flows, minor cleanups |
+
+Net effect: the app went from a first spec implementation to a data-driven,
+fully localised (it/en), tabbed GUI with a safe atomic write path, a shared
+file-I/O module, reusable widgets, an install-time reset, CI/CD releases,
+distro-portable system commands, an English codebase and a single type-rules
+dispatch table.
+>>>>>>> 1b8b488 (English codebase (comments/docstrings) + refactoring)
 
 ---
 

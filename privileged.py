@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
-"""Helper privilegiato per le operazioni su /etc/gamemode.ini.
+"""Privileged helper for operations on /etc/gamemode.ini.
 
-Questo modulo viene eseguito COME ROOT tramite ``pkexec`` (oppure fallback
-``sudo``) dalla GUI. Non deve essere importato direttamente dall'app: è un
-comando a sé stante invocato con subprocess.
+This module is run AS ROOT via ``pkexec`` (or the ``sudo`` fallback) by the GUI.
+It must not be imported directly by the app: it is a standalone command invoked
+with subprocess.
 
-Perché esiste?
-    Il file che vogliamo gestire vive in ``/etc`` (root-owned). La GUI gira
-    come utente normale, quindi tutte le *scritture* (tmp, backup, replace,
-    rollback) devono avvenire in un processo privilegiato.
+Why does it exist?
+    The file we manage lives in ``/etc`` (root-owned). The GUI runs as a normal
+    user, so all *writes* (tmp, backup, replace, rollback) must happen in a
+    privileged process.
 
-La logica di scrittura atomica/backup/rollback NON è qui: sta in ``fileops.py``,
-condivisa con il percorso locale della GUI. Questo file si occupa solo del
-parsing della riga di comando e dell'I/O da stdin.
+The atomic write/backup/rollback logic is NOT here: it lives in ``fileops.py``,
+shared with the GUI's local path. This file only handles command-line parsing and
+stdin I/O.
 
-Comandi:
-    commit <path> [seed]     riscrive il file leggendo il contenuto da stdin.
-                             ``seed`` è il percorso opzionale di un file con il
-                             contenuto "vergine" da usare per ``.orig``.
-    restore-backup <path>    ripristina ``.bak`` -> file attivo.
-    restore-orig <path>      ripristina ``.orig`` -> file attivo.
-    ensure-orig <path>       crea ``.orig`` se assente (stdin = contenuto di
-                             default da usare quando il file non esiste).
+Commands:
+    commit <path> [seed]     rewrite the file reading the content from stdin.
+                             ``seed`` is the optional path of a file with the
+                             "pristine" content to use for ``.orig``.
+    restore-backup <path>    restore ``.bak`` -> active file.
+    restore-orig <path>      restore ``.orig`` -> active file.
+    ensure-orig <path>       create ``.orig`` if missing (stdin = default content
+                             to use when the file does not exist).
 
-File gestiti (tutti accanto a <path>):
-    <path>.tmp   contenuto nuovo, non ancora committato
-    <path>.bak   copia del file attivo precedente al commit
-    <path>.orig  copia iniziale "vergine" (mai riscritta automaticamente)
+Managed files (all next to <path>):
+    <path>.tmp   new content, not yet committed
+    <path>.bak   copy of the active file before the commit
+    <path>.orig  initial "pristine" copy (never rewritten automatically)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ import fileops
 
 
 def _read_seed(path: str | None) -> str | None:
-    """Legge il file "seed" (contenuto vergine) se indicato, altrimenti None."""
+    """Read the "seed" file (pristine content) if given, otherwise None."""
     if not path:
         return None
     try:
@@ -50,7 +50,7 @@ def _read_seed(path: str | None) -> str | None:
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         sys.stderr.write(
-            "uso: privileged.py <commit|restore-backup|restore-orig|ensure-orig> <path> [seed]\n")
+            "usage: privileged.py <commit|restore-backup|restore-orig|ensure-orig> <path> [seed]\n")
         return 2
 
     command, target = argv[0], argv[1]
@@ -73,13 +73,13 @@ def main(argv: list[str]) -> int:
             fileops.ensure_orig(target, seed_content=content)
             sys.stdout.write("ok\n")
         else:
-            sys.stderr.write(f"comando sconosciuto: {command}\n")
+            sys.stderr.write(f"unknown command: {command}\n")
             return 2
     except OSError as exc:
-        sys.stderr.write(f"errore: {exc}\n")
+        sys.stderr.write(f"error: {exc}\n")
         return 1
     except FileNotFoundError as exc:
-        sys.stderr.write(f"errore: {exc}\n")
+        sys.stderr.write(f"error: {exc}\n")
         return 1
 
     return 0

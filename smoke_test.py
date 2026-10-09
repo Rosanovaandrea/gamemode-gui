@@ -1,8 +1,8 @@
-"""Smoke test dell'interfaccia.
+"""Interface smoke test.
 
-Crea la finestra reale (serve un DISPLAY), naviga tutti gli step, modifica
-un'opzione e salva su un percorso temporaneo (GAMEMODE_CONFIG), così la
-configurazione reale dell'utente non viene mai toccata.
+Builds the real window (needs a DISPLAY), navigates all the tabs, edits an option
+and saves to a temporary path (GAMEMODE_CONFIG), so the user's real configuration
+is never touched.
 """
 
 import os
@@ -15,10 +15,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import GLib, Gtk
 
-# Isolamento: percorso config temporaneo + home temporanea
+# Isolation: temporary config path + temporary home
 tmp = tempfile.mkdtemp(prefix="gamemodegui_test_")
 os.environ["GAMEMODE_CONFIG"] = os.path.join(tmp, "config", "gamemode.ini")
-# Nessuna base installata: il test resta ermetico (non legge /usr/share reale).
+# No installed base: the test stays hermetic (does not read the real /usr/share).
 os.environ["GAMEMODE_BASE"] = ""
 os.environ["HOME"] = os.path.join(tmp, "home")
 os.environ["XDG_CONFIG_HOME"] = os.path.join(tmp, "config")
@@ -46,7 +46,7 @@ def exercise(*_):
     results.append(("presentation_blocks",
                     len(win.presentation_tab.presentation.blocks)))
 
-    # modifica un'opzione nella scheda Generale (nessun "Includi" da attivare)
+    # edit an option in the General tab (no "Include" to turn on)
     first = win.general_tab.rows[0]
     results.append(("stepper_button_styled",
                     "stepper-button" in first._input.minus.get_css_classes()
@@ -63,7 +63,7 @@ def exercise(*_):
         with open(win.config_path) as fh:
             content = fh.read()
         results.append(("file_has_reaper_value", "reaper_freq=10" in content))
-        # I default NON vengono piu' scritti: il file contiene solo le attive.
+        # Defaults are NOT written anymore: the file contains only the active ones.
         results.append(("file_hides_defaults", "renice" not in content))
         results.append(("file_hides_idle_gpu", "[gpu]" not in content))
         results.append(("orig_created", os.path.isfile(win.cm.orig_path)))
@@ -71,7 +71,7 @@ def exercise(*_):
 
     results.append(("dirty_after_save", win._dirty))
 
-    # --- interruttore power plan GPU ---------------------------------------
+    # --- GPU power plan switch ----------------------------------------------
     master = win.gpu_tab.rows[0]
     sub = win.gpu_tab.rows[1]
     results.append(("gpu_master_key", master.spec.key))
@@ -81,7 +81,7 @@ def exercise(*_):
     results.append(("gpu_sub_enabled_when_on", sub.get_sensitive()))
     sub.set_value(2)
 
-    # --- ioprio: scelta a pulsanti con valori speciali ----------------------
+    # --- ioprio: button choice with special values --------------------------
     ioprio_row = next(r for r in win.general_tab.rows if r.spec.key == "ioprio")
     ioprio_labels = [b.get_label() for b in ioprio_row._input._buttons]
     results.append(("ioprio_buttons", "off" in ioprio_labels and "reset" in ioprio_labels))
@@ -94,7 +94,7 @@ def exercise(*_):
     ioprio_row.set_value("6")
     results.append(("ioprio_six_value", win.controller.get_value("general.ioprio")))
 
-    # --- CPU: pinning (checkbox core) + parking (switch) --------------------
+    # --- CPU: pinning (core checkboxes) + parking (switch) ------------------
     cpu_pin = next(r for r in win.cpu_tab.rows if r.spec.key == "pin_cores")
     cpu_park = next(r for r in win.cpu_tab.rows if r.spec.key == "park_cores")
     results.append(("cpu_pin_checks", len(cpu_pin._input._checks) > 0))
@@ -103,12 +103,12 @@ def exercise(*_):
     results.append(("cpu_pin_value", win.controller.get_value("cpu.pin_cores")))
     results.append(("cpu_park_value", win.controller.get_value("cpu.park_cores")))
 
-    # --- Custom: liste start/end + timeout ---------------------------------
+    # --- Custom: start/end lists + timeout ----------------------------------
     start_row = next(r for r in win.custom_tab.rows if r.spec.key == "start")
     start_row.set_value(["echo start"])
     results.append(("custom_start_value", win.controller.get_value("custom.start")))
 
-    # --- Custom: toggle notifiche (card in cima) ---------------------------
+    # --- Custom: notification toggles (card at the top) ---------------------
     notify_start = next(r for r in win.custom_tab.rows
                         if r.spec.key == "notify_start")
     notify_end = next(r for r in win.custom_tab.rows if r.spec.key == "notify_end")
@@ -121,7 +121,7 @@ def exercise(*_):
                     and win.controller.get_value("custom.notify_end") is True))
     results.append(("render_notify_start",
                     'start=notify-send "GameMode started"' in win.controller.render()))
-    # La notifica non compare tra gli elementi editabili della lista.
+    # The notification does not appear among the editable list items.
     results.append(("custom_start_excludes_notify",
                     'notify-send' not in " ".join(start_row.get_value())))
 
@@ -137,20 +137,20 @@ def exercise(*_):
     results.append(("file_notify_start", 'start=notify-send "GameMode started"' in content))
     results.append(("file_notify_end", 'end=notify-send "GameMode ended"' in content))
 
-    # Navigazione a schede: si puo' andare su qualunque scheda.
+    # Tab navigation: you can go to any tab.
     win.stack.set_visible_child_name("daemon")
     results.append(("switch_to_daemon", win.stack.get_visible_child_name()))
-    win.daemon_tab.append_console("prova console")
+    win.daemon_tab.append_console("console test")
     cbuf = win.daemon_tab._console_buf
     ctext = cbuf.get_text(cbuf.get_start_iter(), cbuf.get_end_iter(), False)
-    results.append(("daemon_console", "prova console" in ctext))
+    results.append(("daemon_console", "console test" in ctext))
     win.daemon_tab.clear_console()
     ctext = cbuf.get_text(cbuf.get_start_iter(), cbuf.get_end_iter(), False)
     results.append(("daemon_console_clear", ctext == ""))
     win.stack.set_visible_child_name("summary")
     results.append(("switch_to_summary", win.stack.get_visible_child_name()))
 
-    # Una nuova modifica torna "dirty".
+    # A new edit turns "dirty" again.
     first.set_value(20)
     results.append(("dirty_again", win._dirty))
     results.append(("value_after_edit", win.controller.get_value(first.spec.id)))

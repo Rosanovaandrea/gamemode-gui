@@ -1,9 +1,9 @@
 name: Build packages
 
-# - Su push di un tag "vX.Y.Z": costruisce .deb e .rpm e li pubblica in una
-#   Release di GitHub (sezione "Releases").
-# - Manualmente (workflow_dispatch): costruisce e carica gli artifact, senza
-#   creare la release.
+# - On pushing a "vX.Y.Z" tag: builds the .deb and the .rpm and publishes them in
+#   a GitHub Release (the "Releases" section).
+# - Manually (workflow_dispatch): builds and uploads the artifacts, without
+#   creating a release.
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - "v*"
   workflow_dispatch:
 
-# Un solo build per ref: evita release concorrenti su push ravvicinati.
+# A single build per ref: avoids concurrent releases on closely spaced pushes.
 concurrency:
   group: packages-${{ github.ref }}
   cancel-in-progress: false
@@ -30,17 +30,17 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          # dpkg-deb (dal pacchetto dpkg) per il .deb; rpm/rpmbuild per l'.rpm.
+          # dpkg-deb (from the dpkg package) for the .deb; rpm/rpmbuild for the .rpm.
           sudo apt-get install -y dpkg-dev rpm
 
       - name: Build packages
         run: |
-          # Se siamo su un tag, usa la versione dal tag (es. v1.2.3 -> 1.2.3).
+          # If we are on a tag, use the version from the tag (e.g. v1.2.3 -> 1.2.3).
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             export VERSION="${GITHUB_REF_NAME#v}"
           fi
           bash packaging/build.sh
-          echo "--- file generati ---"
+          echo "--- generated files ---"
           ls -l dist/
 
       - name: Upload packages
@@ -55,7 +55,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    # Solo sui tag: crea/aggiorna la Release e allega i pacchetti.
+    # Only on tags: create/update the Release and attach the packages.
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:

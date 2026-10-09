@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  File di lingua per la GameMode GUI.
+  Language file for the GameMode GUI.
 
-  Aggiungere una nuova lingua: copiare questo file in locale/<codice>.xml,
-  tradurre le voci e aggiungere il codice a SUPPORTED_LANGS in core.py. La
-  lingua attiva si sceglie in quest'ordine: scelta salvata dall'utente, locale
-  di sistema (it/en, altrimenti inglese).
+  Adding a new language: copy this file to locale/<code>.xml, translate the
+  entries and add the code to "supported_langs" in settings.json (default: it,
+  en). The active language is chosen from (in order): the user's saved choice,
+  the system locale (it/en, otherwise English).
 -->
 <translations lang="it" name="Italiano">
   <!-- ===== Finestra / header ===== -->

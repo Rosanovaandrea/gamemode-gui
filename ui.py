@@ -1,18 +1,19 @@
-"""Interfaccia GTK4/Libadwaita — un unico file, con schede generate dai dati.
+"""GTK4/Libadwaita interface — a single file, with tabs generated from the data.
 
-Struttura del file (per facilitare la navigazione):
+File layout (to ease navigation):
 
-  1. CAPITOLO 1 — import, costanti, dialoghi, stile console
-  2. CAPITOLO 2 — controller di sessione (stato in memoria)
-  3. CAPITOLO 3 — schede delle opzioni (generate da options.json)
-  4. CAPITOLO 4 — scheda Riepilogo (anteprima + salva + ripristini)
-  5. CAPITOLO 5 — scheda Daemon (console, riavvio, test, gruppo gamemode)
-  6. CAPITOLO 6 — helper condivisi tra le schede
-  7. CAPITOLO 7 — finestra principale (ViewStack + ViewSwitcher a schede)
-  8. CAPITOLO 8 — applicazione (entry point Gtk)
+  1. CHAPTER 1 — imports, constants, dialogs, console style
+  2. CHAPTER 2 — session controller (in-memory state)
+  3. CHAPTER 3 — option tabs (generated from options.json)
+  4. CHAPTER 4 — Summary tab (preview + save + restores)
+  5. CHAPTER 5 — Daemon tab (console, restart, tests, gamemode group)
+  6. CHAPTER 5b — Presentation tab (data-driven content)
+  7. CHAPTER 6 — helpers shared between the tabs
+  8. CHAPTER 7 — main window (ViewStack + ViewSwitcher tabs)
+  9. CHAPTER 8 — application (Gtk entry point)
 
-Le stringhe visibili passano SEMPRE da core.tr() (i18n via XML), mai hardcodate.
-Le schede e le opzioni derivano da `options.json`: aggiungere una voce lì basta.
+Visible strings ALWAYS go through core.tr() (i18n via XML), never hardcoded.
+The tabs and options come from `options.json`: adding an entry there is enough.
 """
 
 from __future__ import annotations
@@ -31,13 +32,14 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 import core
 from core import Category, ConfigManager, OptionSpec, tr
+from widgets import OptionRow
 
 
 # ===========================================================================
-# CAPITOLO 1 — costanti globali, dialoghi, stile console
+# CHAPTER 1 — global constants, dialogs, console style
 # ===========================================================================
 
-# Schede visibili: le categorie (da options.json) + Riepilogo e Daemon.
+# Visible tabs: the categories (from options.json) + Summary and Daemon.
 TABS_META = [("presentation", tr("tab.presentation"))] + [
     (cat.id, tr(cat.tab_id)) for cat in core.CATEGORIES
 ] + [
@@ -47,10 +49,10 @@ TABS_META = [("presentation", tr("tab.presentation"))] + [
 
 
 def resolve_config_path() -> str:
-    """Percorso del file gamemode.ini gestito dalla GUI.
+    """Path of the gamemode.ini file managed by the GUI.
 
-    Default: /etc/gamemode.ini (percorso unico e privilegiato). Sovrascrivibile
-    con la variabile GAMEMODE_CONFIG per i test.
+    Default: /etc/gamemode.ini (single, privileged path). Overridable with the
+    GAMEMODE_CONFIG variable for tests.
     """
     override = os.environ.get("GAMEMODE_CONFIG")
     if override:
@@ -88,18 +90,18 @@ def error_dialog(parent, heading: str, body: str) -> Adw.MessageDialog:
 
 
 def missing_dialog(parent, heading: str, body: str) -> Adw.MessageDialog:
-    """Dialogo per "file non trovato" / ripristino fallito."""
+    """Dialog for "file not found" / failed restore."""
     return info_dialog(parent, heading, body, close=tr("dlg.close"))
 
 
-# Stile dell'applicazione: caricato dal file `style.css` accanto al codice
-# (console della scheda Daemon, scelta selezionata a sfondo d'accento, testi
-# "+"/"−" degli stepper nel colore d'accento).
+# Application style: loaded from the `style.css` file next to the code
+# (Daemon tab console, selected choice with accent background, "+"/"−" stepper
+# texts in the accent colour).
 _STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.css")
 
 
 def install_app_css() -> bool:
-    """Registra lo stile dell'app da `style.css`. Ritorna True se aggiunto."""
+    """Register the app style from `style.css`. Returns True if it was added."""
     try:
         provider = Gtk.CssProvider()
         provider.load_from_path(_STYLE_FILE)
@@ -114,14 +116,14 @@ def install_app_css() -> bool:
 
 
 # ===========================================================================
-# CAPITOLO 2 — controller di sessione (stato in memoria)
+# CHAPTER 2 — session controller (in-memory state)
 # ===========================================================================
 
 class SessionController:
-    """Stato in memoria: il valore corrente di ogni opzione.
+    """In-memory state: the current value of every option.
 
-    I valori "effettivi" sono il risultato del merge tra il file installato
-    dal pacchetto (base) e l'override in /etc, come fa il daemon.
+    The "effective" values are the result of the merge between the file installed
+    by the package (base) and the override in /etc, as the daemon does.
     """
 
     def __init__(self) -> None:
@@ -131,11 +133,11 @@ class SessionController:
         self.on_change: Optional[Callable[[], None]] = None
 
     def load_from_path(self, override_path: str, base_path: Optional[str] = None) -> None:
-        """Carica i valori effettivi (base installata + override)."""
+        """Load the effective values (installed base + override)."""
         self.base_path = base_path if base_path and os.path.isfile(base_path) else None
         self.base_comments = core.load_base_comments(self.base_path)
         self.values = core.load_effective_values(self.base_path, override_path)
-        # Se non esiste né l'override né la base, proviamo la sessione salvata.
+        # If neither the override nor the base exist, try the saved session.
         if not os.path.isfile(override_path) and self.base_path is None:
             restored = core.load_session(override_path)
             if restored is not None:
@@ -156,14 +158,11 @@ class SessionController:
 
 
 # ===========================================================================
-# CAPITOLO 3 — schede delle opzioni (generate dalle categorie)
+# CHAPTER 3 — option tabs (generated from the categories)
 # ===========================================================================
 
-from widgets import OptionRow  # noqa: E402
-
-
 class OptionTab(Gtk.Box):
-    """Scheda con tutte le opzioni di una categoria + pulsante Salva."""
+    """Tab with all the options of a category + Save button."""
 
     def __init__(self, category: Category, controller: SessionController, actions) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -195,13 +194,13 @@ class OptionTab(Gtk.Box):
         return bar
 
     def refresh(self) -> None:
-        """Riallinea tutte le righe allo stato del controller."""
+        """Realign all rows with the controller state."""
         for row in self.rows:
             _populate_row(row, self.controller)
         self.refresh_gating()
 
     def refresh_gating(self) -> None:
-        """Abilita/disabilita le opzioni in base alle loro dipendenze."""
+        """Enable/disable options based on their dependencies."""
         values = self.controller.values
         for row in self.rows:
             dep = getattr(row.spec, "depends_on", None)
@@ -210,11 +209,11 @@ class OptionTab(Gtk.Box):
 
 
 # ===========================================================================
-# CAPITOLO 4 — scheda Riepilogo (anteprima + salva + ripristini)
+# CHAPTER 4 — Summary tab (preview + save + restores)
 # ===========================================================================
 
 class SummaryTab(Gtk.Box):
-    """Anteprima del file + pulsanti Salva / ripristini."""
+    """File preview + Save / restore buttons."""
 
     def __init__(self, controller: SessionController, actions,
                  config_path: str = "", base_path: Optional[str] = None) -> None:
@@ -258,11 +257,11 @@ class SummaryTab(Gtk.Box):
 
 
 # ===========================================================================
-# CAPITOLO 5 — scheda Daemon (console, riavvio, test, gruppo gamemode)
+# CHAPTER 5 — Daemon tab (console, restart, tests, gamemode group)
 # ===========================================================================
 
 class DaemonTab(Gtk.Box):
-    """Gestione del daemon: riavvio, test, gruppo gamemode e console simulata."""
+    """Daemon management: restart, tests, gamemode group and simulated console."""
 
     def __init__(self, actions) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -270,7 +269,7 @@ class DaemonTab(Gtk.Box):
 
         self.append(_header(tr("tab.daemon.title"), tr("tab.daemon.subtitle")))
 
-        # Riquadro azioni sul daemon.
+        # Box with the daemon actions.
         actions_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         actions_box.add_css_class("card")
         actions_box.set_margin_top(4)
@@ -289,7 +288,7 @@ class DaemonTab(Gtk.Box):
         actions_box.append(test)
         self.append(actions_box)
 
-        # Riquadro gruppo gamemode.
+        # gamemode group box.
         group_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         group_box.add_css_class("card")
         group_box.set_margin_top(4)
@@ -308,8 +307,8 @@ class DaemonTab(Gtk.Box):
         group_box.append(self.add_group_btn)
         self.append(group_box)
 
-        # Console simulata: sempre visibile, mostra i comandi e il loro output
-        # grezzo (senza alcun verdetto di successo/errore).
+        # Simulated console: always visible, shows the commands and their raw
+        # output (without any success/error verdict).
         console_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         console_header.append(Gtk.Label(label=tr("daemon.console.title"), xalign=0.0,
                                         hexpand=True, css_classes=["heading"]))
@@ -330,12 +329,12 @@ class DaemonTab(Gtk.Box):
 
         self.refresh_group()
 
-    # -- console simulata -----------------------------------------------------
+    # -- simulated console ----------------------------------------------------
     def clear_console(self) -> None:
         self._console_buf.set_text("")
 
     def append_console(self, text: str) -> None:
-        """Aggiunge testo alla console e scorre in fondo."""
+        """Append text to the console and scroll to the bottom."""
         if text is None:
             return
         end = self._console_buf.get_end_iter()
@@ -346,7 +345,7 @@ class DaemonTab(Gtk.Box):
             self._console_buf.get_end_iter(), 0.0, False, 0.0, 0.0)
 
     def refresh_group(self) -> None:
-        """Aggiorna lo stato del gruppo gamemode."""
+        """Update the gamemode group status."""
         if not core.group_exists():
             self.add_group_btn.set_sensitive(False)
             self.group_status.set_text(tr("step.restart.group_missing"))
@@ -359,14 +358,14 @@ class DaemonTab(Gtk.Box):
 
 
 # ===========================================================================
-# CAPITOLO 5b — scheda Presentazione (contenuti data-driven)
+# CHAPTER 5b — Presentation tab (data-driven content)
 # ===========================================================================
 
 class PresentationTab(Gtk.Box):
-    """Pagina introduttiva: cos'è GameMode, come usarlo, avvertenze.
+    """Introductory page: what GameMode is, how to use it, warnings.
 
-    I blocchi e i testi arrivano da ``presentation.json`` + i file di lingua,
-    quindi aggiungere/modificare contenuti non richiede codice.
+    The blocks and texts come from ``presentation.json`` + the language files, so
+    adding/editing content needs no code.
     """
 
     def __init__(self, presentation=None) -> None:
@@ -387,7 +386,7 @@ class PresentationTab(Gtk.Box):
 
 
 def _presentation_block(block) -> Gtk.Widget:
-    """Un blocco della Presentazione: titolo + testo (card con icona se avviso)."""
+    """A Presentation block: heading + text (card with icon if a warning)."""
     heading = Gtk.Label(label=tr(block.heading_id), xalign=0.0, wrap=True,
                         css_classes=["heading"])
     body = Gtk.Label(label=tr(block.body_id), xalign=0.0, wrap=True, selectable=True)
@@ -414,7 +413,7 @@ def _presentation_block(block) -> Gtk.Widget:
 
 
 # ===========================================================================
-# CAPITOLO 6 — helper condivisi tra le schede
+# CHAPTER 6 — helpers shared between the tabs
 # ===========================================================================
 
 def _header(title: str, subtitle: str) -> Gtk.Box:
@@ -427,14 +426,14 @@ def _header(title: str, subtitle: str) -> Gtk.Box:
 
 def _build_option_list(controller: SessionController, category: Category,
                        rows: List[OptionRow]) -> Gtk.Widget:
-    """Costruisce la lista scorrevole di righe per una categoria."""
+    """Build the scrollable list of rows for a category."""
     scroller = Gtk.ScrolledWindow(vexpand=True)
     listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
     listbox.add_css_class("boxed-list")
 
     for spec in category.options:
         if spec.type == "toggle_entry":
-            continue  # questi finiscono nella card in cima (vedi _build_toggle_card)
+            continue  # these go into the top card (see _build_toggle_card)
         row = OptionRow(spec)
         _populate_row(row, controller)
         row._on_change = lambda spec_id, _r=row: _apply_row_change(
@@ -449,10 +448,10 @@ def _build_option_list(controller: SessionController, category: Category,
 def _build_toggle_card(category: Category, specs: List[OptionSpec],
                        controller: SessionController,
                        rows: List[OptionRow]) -> Gtk.Widget:
-    """Card in cima alla scheda con gli interruttori "toggle_entry".
+    """Card at the top of the tab with the "toggle_entry" switches.
 
-    Ogni interruttore aggiunge/rimuove una stringa fissa (``entry``) dalla lista
-    bersaglio (``target``): la lista stessa mostra solo gli altri script.
+    Each switch adds/removes a fixed string (``entry``) to/from the target list
+    (``target``): the list itself shows only the other scripts.
     """
     card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
     card.add_css_class("card")
@@ -481,7 +480,7 @@ def _build_toggle_card(category: Category, specs: List[OptionSpec],
 
 
 def _populate_row(row: OptionRow, controller: SessionController) -> None:
-    """Sincronizza una riga con lo stato corrente, senza propagare eventi."""
+    """Sync a row with the current state, without propagating events."""
     row._suppress = True
     row.set_value(controller.get_value(row.spec.id))
     row._suppress = False
@@ -493,11 +492,11 @@ def _apply_row_change(controller: SessionController, row: OptionRow,
 
 
 # ===========================================================================
-# CAPITOLO 7 — Finestra principale (navigazione a schede)
+# CHAPTER 7 — Main window (tabbed navigation)
 # ===========================================================================
 
 class GameModeWindow(Adw.ApplicationWindow):
-    """Finestra principale: header con selettore a schede + stack delle schede."""
+    """Main window: header with the tab switcher + tab stack."""
 
     def __init__(self, *args, **kwargs) -> None:
         application = kwargs.pop("application", None) or (args[0] if args else None)
@@ -505,7 +504,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         self.set_default_size(1180, 820)
 
         self.config_path = resolve_config_path()
-        # Base = gamemode.ini installato dal pacchetto (variabile per distro).
+        # Base = gamemode.ini installed by the package (varies per distro).
         self.base_path = core.resolve_base_path()
         self.base_content = self._read_text(self.base_path)
         self.cm = ConfigManager(self.config_path, orig_seed=self.base_content)
@@ -518,7 +517,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         self._warn_lang_config()
 
     def _warn_lang_config(self) -> None:
-        """Avvisa (non bloccante) se la configurazione delle lingue ha errori."""
+        """Warn (non-blocking) if the language configuration has errors."""
         for message in core.describe_lang_errors():
             self._show_toast(message)
 
@@ -535,7 +534,7 @@ class GameModeWindow(Adw.ApplicationWindow):
     def _init_data(self) -> None:
         self.controller.load_from_path(self.config_path, self.base_path)
 
-    # -- costruzione UI ---------------------------------------------------------
+    # -- UI construction --------------------------------------------------------
     def _build_ui(self) -> None:
         self.set_title(tr("window.title"))
         install_app_css()
@@ -554,20 +553,20 @@ class GameModeWindow(Adw.ApplicationWindow):
         header.pack_end(help_btn)
         header.pack_end(self._build_lang_button())
 
-        # Stack delle schede.
+        # Tab stack.
         self.stack = Adw.ViewStack()
         if hasattr(self.stack, "set_transition_type"):
             self.stack.set_transition_type(
                 Adw.ViewStackTransitionType.SLIDE_LEFT_RIGHT)
 
-        # Schede: Presentazione (default) + una per categoria + Riepilogo/Daemon.
+        # Tabs: Presentation (default) + one per category + Summary/Daemon.
         self.option_tabs = {}
         self.presentation_tab = PresentationTab()
         pages = {"presentation": self.presentation_tab}
         for cat in core.CATEGORIES:
             tab = OptionTab(cat, self.controller, self)
             self.option_tabs[cat.id] = tab
-            setattr(self, f"{cat.id}_tab", tab)  # es. general_tab, gpu_tab
+            setattr(self, f"{cat.id}_tab", tab)  # e.g. general_tab, gpu_tab
             pages[cat.id] = tab
 
         self.summary_tab = SummaryTab(self.controller, self, self.config_path,
@@ -579,7 +578,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         for name, title in TABS_META:
             self.stack.add_titled(pages[name], name, title)
 
-        # All'avvio si apre la Presentazione (prima scheda).
+        # At startup the Presentation tab opens (first tab).
         self.stack.set_visible_child_name("presentation")
 
         switcher = Adw.ViewSwitcher(stack=self.stack)
@@ -587,7 +586,7 @@ class GameModeWindow(Adw.ApplicationWindow):
             switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
         header.set_title_widget(switcher)
 
-        # Margini attorno all'area di contenuto (padding generale della finestra).
+        # Margins around the content area (general window padding).
         wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         wrapper.set_margin_top(12)
         wrapper.set_margin_bottom(12)
@@ -598,16 +597,16 @@ class GameModeWindow(Adw.ApplicationWindow):
         self.connect("close-request", self._on_close_request)
 
     def _build_lang_button(self) -> Gtk.Widget:
-        """Pulsante nell'header con il menu delle lingue disponibili.
+        """Header button with the menu of available languages.
 
-        La voce selezionata è quella attiva; sceglierne un'altra la salva
-        (azione `app.set-lang`) in attesa del prossimo avvio.
+        The selected entry is the active one; choosing another saves it
+        (action `app.set-lang`) pending the next start.
         """
         button = Gtk.MenuButton()
         button.set_icon_name("preferences-desktop-locale-symbolic")
         button.set_tooltip_text(tr("header.lang.tooltip"))
         menu = Gio.Menu()
-        # Lingue e nomi vengono dal file di configurazione / dagli XML.
+        # Languages and names come from the config file / the XML files.
         for code, label in core.available_langs():
             item = Gio.MenuItem.new(label, None)
             item.set_action_and_target_value("app.set-lang",
@@ -617,11 +616,11 @@ class GameModeWindow(Adw.ApplicationWindow):
         return button
 
     def notify_language_restart(self) -> None:
-        """Avvisa che la nuova lingua sarà applicata al prossimo avvio."""
+        """Warn that the new language will be applied on the next start."""
         self._run_dialog(info_dialog(self, tr("dlg.lang.title"),
                                      tr("dlg.lang.body")))
 
-    # -- dirty tracking -------------------------------------------------------------
+    # -- dirty tracking ---------------------------------------------------------
     def _mark_dirty(self) -> None:
         self._dirty = True
         self._refresh_gating()
@@ -646,14 +645,14 @@ class GameModeWindow(Adw.ApplicationWindow):
             self._dirty = False
             self.close()
 
-    # -- azioni condivise -----------------------------------------------------------
+    # -- shared actions ---------------------------------------------------------
     def _refresh_all(self) -> None:
         for tab in self.option_tabs.values():
             tab.refresh()
         self.summary_tab.refresh()
 
     def do_save(self) -> None:
-        """Salva il file attivo (commit atomico) + sessione JSON."""
+        """Save the active file (atomic commit) + JSON session."""
         try:
             content = self.controller.render()
         except Exception as exc:
@@ -671,47 +670,40 @@ class GameModeWindow(Adw.ApplicationWindow):
         self.controller.load_from_path(self.config_path, self.base_path)
         self._refresh_all()
         self._dirty = False
-        # Avvisa che le modifiche hanno effetto solo dopo il riavvio del daemon.
+        # Warn that the changes take effect only after restarting the daemon.
         self._run_dialog(info_dialog(self, tr("dlg.save_daemon.title"),
                                      tr("dlg.save_daemon.body")))
 
     def do_restore_backup(self) -> None:
-        dlg = confirm_dialog(self, tr("dlg.restore_bak.title"),
-                             tr("dlg.restore_bak.body"), confirm=tr("btn.restore_backup"))
-        dlg.present()
-        dlg.connect("response", self._restore_backup_response)
-
-    def _restore_backup_response(self, dlg, response: str) -> None:
-        dlg.close()
-        if response != tr("btn.restore_backup"):
-            return
-        if self.cm.rollback_from_backup():
-            self.controller.load_from_path(self.config_path, self.base_path)
-            self._refresh_all()
-            self._mark_dirty()
-            self._show_toast(tr("dlg.restore_bak.ok"))
-        else:
-            self._run_dialog(missing_dialog(self, tr("dlg.restore_bak.title"),
-                                            tr("dlg.restore_bak.none")))
+        """Ask for confirmation and restore the previous `.bak`."""
+        self._confirm_restore("dlg.restore_bak", "btn.restore_backup",
+                              self.cm.rollback_from_backup)
 
     def do_restore_orig(self) -> None:
-        dlg = confirm_dialog(self, tr("dlg.restore_orig.title"),
-                             tr("dlg.restore_orig.body"), confirm=tr("btn.restore_orig"))
-        dlg.present()
-        dlg.connect("response", self._restore_orig_response)
+        """Ask for confirmation and restore the pristine `.orig`."""
+        self._confirm_restore("dlg.restore_orig", "btn.restore_orig",
+                              self.cm.restore_from_orig)
 
-    def _restore_orig_response(self, dlg, response: str) -> None:
+    def _confirm_restore(self, prefix: str, confirm_id: str, restore) -> None:
+        dlg = confirm_dialog(self, tr(f"{prefix}.title"), tr(f"{prefix}.body"),
+                             confirm=tr(confirm_id))
+        dlg.present()
+        dlg.connect("response", lambda d, resp: self._restore_response(
+            d, resp, prefix, confirm_id, restore))
+
+    def _restore_response(self, dlg, response: str, prefix: str, confirm_id: str,
+                          restore) -> None:
         dlg.close()
-        if response != tr("btn.restore_orig"):
+        if response != tr(confirm_id):
             return
-        if self.cm.restore_from_orig():
+        if restore():
             self.controller.load_from_path(self.config_path, self.base_path)
             self._refresh_all()
             self._mark_dirty()
-            self._show_toast(tr("dlg.restore_orig.ok"))
+            self._show_toast(tr(f"{prefix}.ok"))
         else:
-            self._run_dialog(missing_dialog(self, tr("dlg.restore_orig.title"),
-                                            tr("dlg.restore_orig.none")))
+            self._run_dialog(missing_dialog(self, tr(f"{prefix}.title"),
+                                            tr(f"{prefix}.none")))
 
     def do_add_group(self, on_done=None) -> None:
         user = getpass.getuser()
@@ -733,7 +725,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         console.append_console(res.output)
 
     def run_tests(self) -> None:
-        """Esegue i comandi di test del daemon e ne mostra l'output in console."""
+        """Run the daemon test commands and show their output in the console."""
         console = self.daemon_tab
         res_test = core.test_daemon()
         console.append_console(tr("daemon.console.cmd").format(
@@ -755,7 +747,7 @@ class GameModeWindow(Adw.ApplicationWindow):
 
 
 # ===========================================================================
-# CAPITOLO 8 — Applicazione (entry point Gtk)
+# CHAPTER 8 — Application (Gtk entry point)
 # ===========================================================================
 
 class GameModeApplication(Adw.Application):
@@ -768,7 +760,7 @@ class GameModeApplication(Adw.Application):
         self._install_actions()
 
     def _install_actions(self) -> None:
-        """Azione con stato per la scelta della lingua (voci a radio)."""
+        """Stateful action for the language choice (radio entries)."""
         action = Gio.SimpleAction.new_stateful(
             "set-lang", GLib.VariantType.new("s"),
             GLib.Variant.new_string(core.current_lang()))
@@ -780,18 +772,18 @@ class GameModeApplication(Adw.Application):
         if code == action.get_state().get_string():
             return
         action.set_state(value)
-        core.save_lang(code)  # la scelta salvata ha la precedenza su tutto
+        core.save_lang(code)  # the saved choice takes precedence over everything
         if self._window is not None:
             self._window.notify_language_restart()
 
     def do_activate(self) -> None:
-        core.ensure_settings()  # crea/aggiorna settings.json (elenco lingue)
+        core.ensure_settings()  # create/update settings.json (language list)
         if self._window is None:
             self._window = GameModeWindow(application=self)
         self._window.present()
 
 
 def main() -> int:
-    """Entry point per lanciare l'applicazione."""
+    """Entry point to launch the application."""
     app = GameModeApplication()
     return app.run(sys.argv)

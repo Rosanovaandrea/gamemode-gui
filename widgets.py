@@ -1,22 +1,24 @@
-"""Widget GTK riutilizzabili per la GUI.
+"""Reusable GTK widgets for the GUI.
 
-Questo modulo raccoglie i *building block* dell'interfaccia. La costruzione del
-controllo per un'opzione è centralizzata in :func:`build_widget`: si sceglie il
-widget in base ai campi della definizione JSON (``value_type`` / ``widget``), in
-modo che non serva codice ad hoc per ogni opzione. Le uniche differenze per i
-valori "speciali" stanno in ``core.resolve_choices`` (i valori arrivano dal
-sistema), ma il widget resta standard.
+This module collects the *building blocks* of the interface. The construction of
+the control for an option is centralised in :func:`build_widget`: the widget is
+chosen from the fields of the JSON definition (``value_type`` / ``widget``), so no
+per-option code is needed. The only difference for "special" values is in
+``core.resolve_choices`` (the values come from the system), but the widget stays
+standard.
 
-Contiene:
+It contains:
 
-  * :func:`build_widget`  — controllo standard per tipo (stepper/switch/radio/list/entry)
-  * :class:`ChoicePicker` — scelta singola SENZA dropdown: radio button in un FlowBox
-  * :class:`StepperBox`   — valore numerico con "-" e "+", vincolato a min/max
-  * :class:`ListEditor`   — editor di liste (es. script custom start/end)
-  * :class:`OptionRow`    — riga completa: "nome: descrizione" + selettore sotto
+  * :func:`build_widget`  — standard control per type (stepper/switch/radio/list/entry)
+  * :class:`ChoicePicker` — single choice WITHOUT dropdown: radio buttons in a FlowBox
+  * :class:`StepperBox`   — numeric value with "-" and "+", bounded by min/max
+  * :class:`SwitchBox`    — on/off switch with the same value interface
+  * :class:`ListEditor`   — list editor (e.g. custom start/end scripts)
+  * :class:`CoresEditor`  — CPU core selection (checkboxes)
+  * :class:`OptionRow`    — full row: "name: description" + control below
 
-Tutti espongono la stessa interfaccia valori: ``get_value()`` / ``set_value(v)``
-/ ``set_sensitive(b)`` e un callback ``on_change``.
+All expose the same value interface: ``get_value()`` / ``set_value(v)`` /
+``set_sensitive(b)`` and an ``on_change`` callback.
 """
 
 from __future__ import annotations
@@ -34,10 +36,10 @@ from core import tr
 
 
 # ===========================================================================
-# Scelta singola a pulsanti radio (niente dropdown)
+# Single choice with radio buttons (no dropdown)
 # ===========================================================================
 class ChoicePicker(Gtk.Box):
-    """Gruppo di radio-button per scegliere UN valore tra ``choices``."""
+    """Group of radio buttons to choose ONE value among ``choices``."""
 
     def __init__(
         self,
@@ -91,14 +93,14 @@ class ChoicePicker(Gtk.Box):
                 self._suppress = False
         self._on_change()
 
-    # -- API valori ----------------------------------------------------------
+    # -- Value API -----------------------------------------------------------
     def get_value(self) -> str:
         return self._selected or ""
 
     def set_value(self, value) -> None:
         value = str(value or "")
-        # Il valore corrente potrebbe non essere tra le scelte (es. governor
-        # non più disponibile): lo aggiungiamo per poterlo mostrare.
+        # The current value may not be among the choices (e.g. a governor that is
+        # no longer available): add it so it can still be shown.
         if value and value not in self._values:
             self._add_button(value)
         self._selected = value
@@ -113,10 +115,10 @@ class ChoicePicker(Gtk.Box):
 
 
 # ===========================================================================
-# Stepper numerico (pulsanti - / + con min e max)
+# Numeric stepper (- / + buttons with min and max)
 # ===========================================================================
 class StepperBox(Gtk.Box):
-    """Campo numerico con pulsanti "-" e "+", vincolato tra ``min`` e ``max``."""
+    """Numeric field with "-" and "+" buttons, bounded between ``min`` and ``max``."""
 
     def __init__(
         self,
@@ -167,7 +169,7 @@ class StepperBox(Gtk.Box):
             self.value_label.set_text(self._fmt(new))
             self._on_change()
 
-    # -- API valori ----------------------------------------------------------
+    # -- Value API -----------------------------------------------------------
     def get_value(self):
         if self._digits:
             return round(self._value, self._digits)
@@ -183,14 +185,14 @@ class StepperBox(Gtk.Box):
 
 
 # ===========================================================================
-# Interruttore on/off con interfaccia uniforme (get_value/set_value)
+# On/off switch with a uniform interface (get_value/set_value)
 # ===========================================================================
 class SwitchBox(Gtk.Box):
-    """Interruttore con la stessa interfaccia degli altri input.
+    """Switch with the same interface as the other inputs.
 
-    Con ``on_value``/``off_value`` mappa lo stato su valori testuali (tipo
-    "enable": attivo -> ``on_value``, spento -> ``off_value``). Senza, il valore
-    è un semplice booleano (tipi "bool" e "toggle_entry").
+    With ``on_value``/``off_value`` it maps the state to text values (type
+    "enable": on -> ``on_value``, off -> ``off_value``). Without them, the value
+    is a plain boolean (types "bool" and "toggle_entry").
     """
 
     def __init__(
@@ -217,7 +219,7 @@ class SwitchBox(Gtk.Box):
         if not self._suppress:
             self._on_change()
 
-    # -- API valori ---------------------------------------------------------
+    # -- Value API -----------------------------------------------------------
     def get_value(self):
         if self._on_value is not None:
             return self._on_value if self.switch.get_active() else self._off_value
@@ -236,10 +238,10 @@ class SwitchBox(Gtk.Box):
 
 
 # ===========================================================================
-# Editor di liste (chiavi ripetute: es. script custom start/end)
+# List editor (repeated keys: e.g. custom start/end scripts)
 # ===========================================================================
 class ListEditor(Gtk.Box):
-    """Editor per opzioni di tipo lista (chiavi ripetute nel file INI)."""
+    """Editor for list-type options (keys repeated in the INI file)."""
 
     def __init__(
         self,
@@ -296,9 +298,8 @@ class ListEditor(Gtk.Box):
             hbox.append(rm)
             row.set_child(hbox)
             self.listbox.append(row)
-        self.listbox.show()
 
-    # -- API valori ---------------------------------------------------------
+    # -- Value API -----------------------------------------------------------
     def get_value(self) -> List[str]:
         return list(self._items)
 
@@ -311,13 +312,13 @@ class ListEditor(Gtk.Box):
 
 
 # ===========================================================================
-# Selettore di core (checkbox) per pinning CPU
+# Core selector (checkboxes) for CPU pinning
 # ===========================================================================
 class CoresEditor(Gtk.Box):
-    """Selezione multipla dei core tramite checkbox.
+    """Multiple core selection via checkboxes.
 
-    I core disponibili arrivano dal sistema (``special_source: cpu_cores``).
-    Il valore è la lista ordinata dei core selezionati (es. ``[0, 2, 4]``).
+    The available cores come from the system (``special_source: cpu_cores``).
+    The value is the sorted list of selected cores (e.g. ``[0, 2, 4]``).
     """
 
     def __init__(
@@ -350,7 +351,7 @@ class CoresEditor(Gtk.Box):
         if not self._suppress:
             self._on_change()
 
-    # -- API valori ---------------------------------------------------------
+    # -- Value API -----------------------------------------------------------
     def get_value(self) -> List[int]:
         return sorted(int(core) for core, chk in self._checks.items()
                       if chk.get_active())
@@ -372,14 +373,15 @@ class CoresEditor(Gtk.Box):
 
 
 # ===========================================================================
-# Builder standard del controllo (nessun codice ad hoc per opzione)
+# Standard control builder (no per-option ad-hoc code)
 # ===========================================================================
 def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
-    """Costruisce il controllo giusto per un'opzione.
+    """Build the right control for an option.
 
-    Il tipo del valore e il widget sono descritti nel JSON: qui c'è un unico
-    punto che li traduce in GTK. Per le opzioni speciali cambiano solo le
-    "choices" (risolte da ``core.resolve_choices``), il widget resta standard.
+    The value type and the widget are described in the JSON: here there is a
+    single point that translates them into GTK. For special options only the
+    "choices" change (resolved by ``core.resolve_choices``); the widget stays
+    standard.
     """
     t = spec.type
     if t in ("int", "float"):
@@ -419,19 +421,19 @@ def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
 
 
 # ===========================================================================
-# Riga dichiarativa per un'opzione ("nome: descrizione" + selettore sotto)
+# Declarative row for an option ("name: description" + control below)
 # ===========================================================================
 class OptionRow(Gtk.Box):
-    """Riga completa per un'opzione della definizione JSON.
+    """Full row for an option of the JSON definition.
 
-    Struttura:
-        <nome opzione>: <descrizione>   <- su una sola riga, ben visibile
-        <widget input costruito per tipo>
+    Structure:
+        <option name>: <description>   <- on a single, clearly visible line
+        <input widget built per type>
 
-    Comportamento:
-      * l'input è SEMPRE attivo e ogni modifica propaga il nuovo valore;
-      * la descrizione è mostrata accanto al nome (niente tooltip/popup);
-      * padding interno per dare respiro tra una riga e l'altra.
+    Behaviour:
+      * the input is ALWAYS active and every change propagates the new value;
+      * the description is shown next to the name (no tooltip/popup);
+      * internal padding to give the rows room to breathe.
     """
 
     def __init__(
@@ -448,7 +450,7 @@ class OptionRow(Gtk.Box):
         self.spec = spec
         self._suppress = False
 
-        # Riga alta: nome opzione + descrizione, separati da ":".
+        # Top line: option name + description, separated by ":".
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         title = Gtk.Label(label=spec.label, xalign=0.0, wrap=True,
                           css_classes=["heading"])
@@ -460,16 +462,16 @@ class OptionRow(Gtk.Box):
         header.append(desc)
         self.append(header)
 
-        # Widget input standard, costruito dal tipo della definizione.
+        # Standard input widget, built from the definition type.
         self._input = build_widget(spec, self._on_value_changed)
         self.append(self._input)
 
-    # -- segnali --------------------------------------------------------------
+    # -- signals -------------------------------------------------------------
     def _on_value_changed(self, *_):
         if not self._suppress:
             self._on_change(self.spec.id)
 
-    # -- API pubblica ----------------------------------------------------------
+    # -- public API ----------------------------------------------------------
     def set_value(self, value) -> None:
         try:
             self._input.set_value(value)
@@ -482,7 +484,7 @@ class OptionRow(Gtk.Box):
         return self._input.get_value()
 
     def set_enabled(self, enabled: bool) -> None:
-        """Attiva/disattiva la riga (usato per le opzioni dipendenti)."""
+        """Enable/disable the row (used for dependent options)."""
         enabled = bool(enabled)
         self.set_sensitive(enabled)
         self._input.set_sensitive(enabled)

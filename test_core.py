@@ -1,5 +1,5 @@
-"""Test della logica (senza GUI): tabella, renderer, attivazione,
-config manager (commit atomico locale + privilegiato), i18n e sessione."""
+"""Logic tests (no GUI): table, renderer, activation, config manager
+(local + privileged atomic commit), i18n and session."""
 
 import os
 import sys
@@ -7,7 +7,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Isolamento: le impostazioni (lingua) non devono leggere la config reale.
+# Isolation: the settings (language) must not read the real config.
 _CFG_TMP = tempfile.mkdtemp(prefix="gamemodegui_core_")
 os.environ["XDG_CONFIG_HOME"] = _CFG_TMP
 
@@ -19,11 +19,11 @@ from core import (
 )
 from core import save_session, load_session
 
-print("== Opzioni in tabella:", len(OPTIONS))
+print("== Options in table:", len(OPTIONS))
 assert "general" in core.SECTIONS_ORDER
 
 # ---------------------------------------------------------------------------
-# 0. Definizioni caricate da options.json (data-driven)
+# 0. Definitions loaded from options.json (data-driven)
 # ---------------------------------------------------------------------------
 assert [c.id for c in core.CATEGORIES] == ["general", "gpu", "cpu", "custom"]
 assert len(OPTIONS) == 25
@@ -31,22 +31,22 @@ for spec in OPTIONS:
     assert spec.description_id and spec.type and spec.widget, spec.id
     assert core.OPTIONS_BY_ID[spec.id] is spec
 
-# Valori "speciali" letti dal sistema (governor CPU).
+# "Special" values read from the system (CPU governor).
 gov_spec = core.OPTIONS_BY_ID["general.desiredgov"]
 assert gov_spec.special and gov_spec.special_source == "cpu_governors"
 govs = core.get_cpu_governors()
-assert govs, "lista governor vuota"
+assert govs, "empty governor list"
 assert core.resolve_choices(gov_spec) == govs
-# Valori normali: scelte statiche dal JSON.
+# Normal values: static choices from the JSON.
 assert core.resolve_choices(core.OPTIONS_BY_ID["general.softrealtime"]) == ["auto", "on", "off"]
 
-# ioprio: scelta a pulsanti con valori speciali "off" e "reset".
+# ioprio: button choice with the special values "off" and "reset".
 ioprio = core.OPTIONS_BY_ID["general.ioprio"]
 ioprio_choices = core.resolve_choices(ioprio)
 assert ioprio.type == "choice" and ioprio.widget == "radio"
 assert "off" in ioprio_choices and "reset" in ioprio_choices
 
-# CPU: pinning speciale (core dal sistema) + parking bool.
+# CPU: special pinning (cores from the system) + bool parking.
 pin = core.OPTIONS_BY_ID["cpu.pin_cores"]
 assert pin.type == "cores" and pin.special and pin.special_source == "cpu_cores"
 cores = core.get_cpu_cores()
@@ -54,27 +54,27 @@ assert cores and all(c.isdigit() for c in cores)
 assert core.resolve_choices(pin) == cores
 assert core.OPTIONS_BY_ID["cpu.park_cores"].type == "bool"
 
-# Custom: start/end liste + timeout int.
+# Custom: start/end lists + int timeout.
 assert core.OPTIONS_BY_ID["custom.start"].type == "list"
 assert core.OPTIONS_BY_ID["custom.end"].type == "list"
 assert core.OPTIONS_BY_ID["custom.script_timeout"].default == 10
-print("== options.json caricato OK (governor:", ", ".join(govs), "| core:", ",".join(cores), ")")
+print("== options.json loaded OK (governor:", ", ".join(govs), "| cores:", ",".join(cores), ")")
 
 # ---------------------------------------------------------------------------
-# 1. Renderer: solo opzioni attive (default NON scritti) + roundtrip
+# 1. Renderer: only active options (defaults NOT written) + roundtrip
 # ---------------------------------------------------------------------------
-# Un file con tutti i default equivale a nessuna chiave.
+# A file with all defaults equals no key.
 assert default_ini() == ""
-print("== default_ini() vuoto (nessun default scritto)")
+print("== default_ini() empty (no default written)")
 
 values = default_values()
 values["general.reaper_freq"] = 10
 values["general.inhibit_screensaver"] = False
 d = render_ini(values)
-print("== render (solo attive):\n", d)
+print("== render (only active):\n", d)
 assert "reaper_freq=10" in d
 assert "inhibit_screensaver=0" in d
-# I default non toccati non compaiono.
+# Untouched defaults do not appear.
 assert "renice" not in d
 assert "disable_splitlock" not in d
 parsed = parse_ini(d)
@@ -84,23 +84,23 @@ assert rendered == d, "roundtrip mismatch"
 print("== roundtrip OK")
 
 # ---------------------------------------------------------------------------
-# 2. [gpu]: le opt dipendenti esistono solo con apply_gpu_optimisations attivo
+# 2. [gpu]: dependent options exist only with apply_gpu_optimisations on
 # ---------------------------------------------------------------------------
 gpu_values = default_values()
-gpu_values["gpu.gpu_device"] = 1          # dipende dall'interruttore, spento
+gpu_values["gpu.gpu_device"] = 1          # depends on the switch, which is off
 gpu_values["gpu.nv_core_clock_mhz_offset"] = 150
 gpu_off = render_ini(gpu_values)
-assert gpu_off == "", f"gpu scritte senza interruttore: {gpu_off!r}"
+assert gpu_off == "", f"gpu written without the switch: {gpu_off!r}"
 
 gpu_values["gpu.apply_gpu_optimisations"] = "accept-responsibility"
 gpu_on = render_ini(gpu_values)
 assert "apply_gpu_optimisations=accept-responsibility" in gpu_on
 assert "gpu_device=1" in gpu_on
 assert "nv_core_clock_mhz_offset=150" in gpu_on
-print("== dipendenza [gpu] OK")
+print("== [gpu] dependency OK")
 
 # ---------------------------------------------------------------------------
-# 3b. CPU (pinning cores + parking) e script custom (liste ripetute)
+# 3b. CPU (core pinning + parking) and custom scripts (repeated lists)
 # ---------------------------------------------------------------------------
 cv = default_values()
 cv["cpu.pin_cores"] = [0, 2, 4]
@@ -125,7 +125,7 @@ assert p_custom["custom"]["start"] == ["notify-send hi", "echo bye"]
 print("== cpu pinning/parking + custom scripts OK")
 
 # ---------------------------------------------------------------------------
-# 3d. Toggle notifiche (value_type "toggle_entry") nella sezione custom
+# 3d. Notification toggles (value_type "toggle_entry") in the custom section
 # ---------------------------------------------------------------------------
 notify_start = core.OPTIONS_BY_ID["custom.notify_start"]
 assert notify_start.type == "toggle_entry"
@@ -135,7 +135,7 @@ assert core.OPTIONS_BY_ID["custom.notify_end"].target == "custom.end"
 
 nv = default_values()
 assert nv["custom.notify_start"] is False and nv["custom.notify_end"] is False
-assert "notify-send" not in render_ini(nv)      # spenti -> nessuna riga
+assert "notify-send" not in render_ini(nv)      # off -> no line
 
 nv["custom.notify_start"] = True
 nv["custom.start"] = ["/home/andrea/gamemode_Start.sh"]
@@ -144,14 +144,14 @@ nv["custom.end"] = ["/home/andrea/gamemode_Stop.sh"]
 r_nv = render_ini(nv)
 assert 'start=notify-send "GameMode started"' in r_nv
 assert 'end=notify-send "GameMode ended"' in r_nv
-# La notifica viene scritta PRIMA degli altri script (come nel template).
+# The notification is written BEFORE the other scripts (as in the template).
 assert (r_nv.index('start=notify-send "GameMode started"')
         < r_nv.index("start=/home/andrea/gamemode_Start.sh"))
 assert (r_nv.index('end=notify-send "GameMode ended"')
         < r_nv.index("end=/home/andrea/gamemode_Stop.sh"))
 
-# Round-trip: leggendo il file la notifica accende il toggle e sparisce dalla
-# lista (è gestita solo dall'interruttore); ricomponendo si ha lo stesso file.
+# Round-trip: reading the file turns the toggle on and removes the string from
+# the list (it is managed only by the switch); recomposing gives the same file.
 with tempfile.TemporaryDirectory() as td:
     p = os.path.join(td, "gamemode.ini")
     with open(p, "w", encoding="utf-8") as fh:
@@ -162,10 +162,10 @@ with tempfile.TemporaryDirectory() as td:
     assert loaded["custom.start"] == ["/home/andrea/gamemode_Start.sh"]
     assert loaded["custom.end"] == ["/home/andrea/gamemode_Stop.sh"]
     assert render_ini(loaded) == r_nv
-print("== toggle notifiche custom OK")
+print("== custom notification toggles OK")
 
 # ---------------------------------------------------------------------------
-# 3c. Base installata + override /etc (merge come il daemon) + commenti
+# 3c. Installed base + /etc override (merge like the daemon) + comments
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     base = os.path.join(td, "usr-share", "gamemode", "gamemode.ini")
@@ -173,84 +173,84 @@ with tempfile.TemporaryDirectory() as td:
     os.makedirs(os.path.dirname(base))
     os.makedirs(os.path.dirname(over))
     with open(base, "w", encoding="utf-8") as fh:
-        fh.write("[general]\n; commento base\nreaper_freq=3\n[custom]\nstart=base1\n")
+        fh.write("[general]\n; base comment\nreaper_freq=3\n[custom]\nstart=base1\n")
     with open(over, "w", encoding="utf-8") as fh:
         fh.write("[general]\nreaper_freq=7\n[custom]\nstart=over1\n")
 
     merged = core.load_effective_values(base, over)
-    assert merged["general.reaper_freq"] == 7                 # override vince
-    assert merged["custom.start"] == ["base1", "over1"]       # liste accodate
+    assert merged["general.reaper_freq"] == 7                 # override wins
+    assert merged["custom.start"] == ["base1", "over1"]       # lists appended
 
     comments = core.load_base_comments(base)
     assert comments["general.reaper_freq"].startswith(";")
     r = core.render_ini(merged, comments)
-    assert "reaper_freq=7" in r and "; commento base" in r
+    assert "reaper_freq=7" in r and "; base comment" in r
 
     os.environ["GAMEMODE_BASE"] = base
     assert core.resolve_base_path() == base
     del os.environ["GAMEMODE_BASE"]
-print("== base installata + override + commenti OK")
+print("== installed base + override + comments OK")
 
 # ---------------------------------------------------------------------------
-# 3. Liste (script custom) come chiavi ripetute
+# 3. Lists (custom scripts) as repeated keys
 # ---------------------------------------------------------------------------
 values2 = default_values()
 values2["custom.start"] = ["notify-send start", "echo go"]
 cfg = render_ini(values2)
 p2 = parse_ini(cfg)
 assert p2["custom"]["start"] == ["notify-send start", "echo go"]
-print("== liste ripetute OK")
+print("== repeated lists OK")
 
 # ---------------------------------------------------------------------------
-# 4. ConfigManager: commit locale atomico + .orig + .bak + rollback
+# 4. ConfigManager: atomic local commit + .orig + .bak + rollback
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
     cm = ConfigManager(path)
-    cm.save(cfg)                                   # primo commit
+    cm.save(cfg)                                   # first commit
     assert os.path.isfile(path)
-    assert os.path.isfile(cm.orig_path)            # .orig creato una volta
+    assert os.path.isfile(cm.orig_path)            # .orig created once
     assert open(path).read() == cfg
-    assert not os.path.isfile(cm.backup_path)      # nessun precedente -> no .bak
+    assert not os.path.isfile(cm.backup_path)      # no previous -> no .bak
 
-    cm.save(d)                                     # secondo commit
-    assert os.path.isfile(cm.backup_path)          # ora .bak esiste
-    assert open(cm.backup_path).read() == cfg      # .bak == stato precedente
+    cm.save(d)                                     # second commit
+    assert os.path.isfile(cm.backup_path)          # now .bak exists
+    assert open(cm.backup_path).read() == cfg      # .bak == previous state
 
-    # rollback dal backup
+    # rollback from the backup
     assert cm.rollback_from_backup()
     assert open(path).read() == cfg
 
-    # ripristino da orig
+    # restore from orig
     assert cm.restore_from_orig()
-    print("== commit locale + .orig + .bak + rollback OK")
+    print("== local commit + .orig + .bak + rollback OK")
 
 # ---------------------------------------------------------------------------
-# 5. i18n via XML (it/en) — selezione, normalizzazione e fallback
+# 5. i18n via XML (it/en) — selection, normalisation and fallback
 # ---------------------------------------------------------------------------
 from core import Translator
 
 assert Translator("it").tr("window.title") == "GameMode GUI"
 assert Translator("it").tr("btn.save") == "Salva"
 assert Translator("en").tr("btn.save") == "Save"
-assert Translator("it").tr("chiave.inesistente") == "chiave.inesistente"  # fallback sul key
+assert Translator("it").tr("key.missing") == "key.missing"  # fallback to the key
 
-# Normalizzazione dei codici lingua (accetta it_IT.UTF-8, en-US, ...).
+# Language-code normalisation (accepts it_IT.UTF-8, en-US, ...).
 assert core.supported_lang("it_IT.UTF-8") == "it"
 assert core.supported_lang("en-US") == "en"
 assert core.supported_lang("fr_FR.UTF-8") is None
 assert core.supported_lang("C") is None
 assert core.supported_lang("") is None
 
-# Rilevamento dal locale di sistema: vince la prima variabile impostata;
-# se non è it/en si usa l'inglese.
+# System-locale detection: the first variable set wins; if it is not it/en,
+# English is used.
 os.environ["LC_ALL"] = "it_IT.UTF-8"
 assert core.detect_system_lang() == "it"
 os.environ["LC_ALL"] = "fr_FR.UTF-8"
 assert core.detect_system_lang() == "en"
 del os.environ["LC_ALL"]
 
-# La preferenza salvata dall'utente ha la precedenza su tutto (anche sul locale).
+# The user's saved preference takes precedence over everything (even the locale).
 with tempfile.TemporaryDirectory() as td:
     os.environ["XDG_CONFIG_HOME"] = td
     os.environ["LC_ALL"] = "it_IT.UTF-8"
@@ -258,47 +258,47 @@ with tempfile.TemporaryDirectory() as td:
     assert core.settings_path().startswith(td)
     core.save_lang("en")
     assert core.load_saved_lang() == "en"
-    assert core.resolve_lang() == "en"       # la scelta salvata vince
-    core.save_lang("fr")                     # non supportata -> inglese
+    assert core.resolve_lang() == "en"       # the saved choice wins
+    core.save_lang("fr")                     # unsupported -> English
     assert core.load_saved_lang() == "en"
     del os.environ["LC_ALL"]
 
-# Elenco lingue letto dalla configurazione + validazione sui file.
+# Language list read from the configuration + validation against the files.
 with tempfile.TemporaryDirectory() as td:
     os.environ["XDG_CONFIG_HOME"] = td
 
-    # Default (nessun settings.json): italiano + inglese.
+    # Defaults (no settings.json): Italian + English.
     core.reset_supported_langs()
     assert core.supported_langs() == ("it", "en")
     assert core.available_langs() == [("it", "Italiano"), ("en", "English")]
     assert core.lang_label("it") == "Italiano"
-    assert core.lang_label("zz") == "ZZ"      # nessun file/attributo -> codice
+    assert core.lang_label("zz") == "ZZ"      # no file/attribute -> code
 
-    # Lista valida con una lingua senza file -> scartata e segnalata.
+    # Valid list with a language without a file -> dropped and reported.
     core.save_settings({"supported_langs": ["it", "en", "de"]})
     core.reset_supported_langs()
     assert core.supported_langs() == ("it", "en")
     assert any("de" in m for m in core.describe_lang_errors())
 
-    # Lista fatta solo di lingue senza file -> fallback ai default + errore.
+    # List made only of languages without files -> fallback to defaults + error.
     core.save_settings({"supported_langs": ["de", "fr"]})
     core.reset_supported_langs()
     assert core.supported_langs() == ("it", "en")
     assert core.describe_lang_errors()
 
-    # Tipo sbagliato per supported_langs -> fallback + errore.
+    # Wrong type for supported_langs -> fallback + error.
     core.save_settings({"supported_langs": "it"})
     core.reset_supported_langs()
     assert core.supported_langs() == ("it", "en")
     assert core.describe_lang_errors()
 
-    # Voci non stringa -> ignorate e segnalate.
+    # Non-string entries -> ignored and reported.
     core.save_settings({"supported_langs": [123, "it"]})
     core.reset_supported_langs()
     assert core.supported_langs() == ("it",)
     assert any("123" in m for m in core.describe_lang_errors())
 
-    # settings.json rotto -> fallback ai default + errore.
+    # Broken settings.json -> fallback to defaults + error.
     with open(core.settings_path(), "w", encoding="utf-8") as fh:
         fh.write("{non-json")
     core.reset_supported_langs()
@@ -307,7 +307,7 @@ with tempfile.TemporaryDirectory() as td:
 print("== i18n OK")
 
 # ---------------------------------------------------------------------------
-# 6. Sessione (persistenza dei valori su file JSON)
+# 6. Session (value persistence on a JSON file)
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
@@ -317,14 +317,14 @@ with tempfile.TemporaryDirectory() as td:
     assert restored is not None
     assert restored["general.reaper_freq"] == 7
     assert restored["general.desiredgov"] == "powersave"
-print("== sessione OK")
+print("== session OK")
 
 # ---------------------------------------------------------------------------
-# 7. Privileged helper (simulazione locale, senza root)
+# 7. Privileged helper (local simulation, without root)
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as td:
     path = os.path.join(td, "gamemode.ini")
-    # execute privileged.py as a subprocess (non-root -> funziona come root locale)
+    # run privileged.py as a subprocess (non-root -> works like local root)
     import subprocess
     helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
     proc = subprocess.run([sys.executable, helper, "commit", path],
@@ -334,15 +334,15 @@ with tempfile.TemporaryDirectory() as td:
     assert os.path.isfile(path + ".orig")
     print("== privileged.py commit OK")
 
-    # Seed del .orig dal file installato (commit con seed path)
+    # Seed the .orig from the installed file (commit with a seed path)
     path2 = os.path.join(td, "gamemode2.ini")
     seed = os.path.join(td, "seed.ini")
     with open(seed, "w", encoding="utf-8") as fh:
-        fh.write("; seed installato\n")
+        fh.write("; installed seed\n")
     proc = subprocess.run([sys.executable, helper, "commit", path2, seed],
                           input=cfg, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
-    assert open(path2 + ".orig").read() == "; seed installato\n"
+    assert open(path2 + ".orig").read() == "; installed seed\n"
     print("== privileged.py seed .orig OK")
 
 print("\nALL CORE TESTS PASSED")
