@@ -80,15 +80,6 @@ def normalize_lang_code(raw: object) -> Optional[str]:
     return code or None
 
 
-def lang_file_path(code: str) -> str:
-    """Path of the language file ``locale/<code>.xml``."""
-    return os.path.join(_LOCALE_DIR, f"{code}.xml")
-
-
-def _has_lang_file(code: str) -> bool:
-    return os.path.isfile(lang_file_path(code))
-
-
 def _compute_supported_langs() -> None:
     """Compute the valid language list once and record the config errors.
 
@@ -127,7 +118,7 @@ def _compute_supported_langs() -> None:
 
     valid: List[str] = []
     for code in candidates:
-        if _has_lang_file(code):
+        if os.path.isfile(os.path.join(_LOCALE_DIR, f"{code}.xml")):
             if code not in valid:
                 valid.append(code)
         else:
@@ -136,7 +127,8 @@ def _compute_supported_langs() -> None:
     # If no configured language is usable, fall back to the safe defaults.
     if not valid:
         for code in _DEFAULT_SUPPORTED_LANGS:
-            if _has_lang_file(code) and code not in valid:
+            if (os.path.isfile(os.path.join(_LOCALE_DIR, f"{code}.xml"))
+                    and code not in valid):
                 valid.append(code)
         if not valid:
             errors.append(("empty", ""))
@@ -160,7 +152,7 @@ def reset_supported_langs() -> None:
 
 def lang_label(code: str) -> str:
     """Language name from the ``name`` attribute of its XML, or the upper-case code."""
-    path = lang_file_path(code)
+    path = os.path.join(_LOCALE_DIR, f"{code}.xml")
     if _ET is not None and os.path.isfile(path):
         try:
             name = (_ET.parse(path).getroot().get("name") or "").strip()
@@ -303,12 +295,11 @@ class Translator:
         if _ET is None:
             return
         # Chained fallback: active language -> fallback language -> default.
-        path = lang_file_path(self.lang)
-        if not os.path.isfile(path):
-            path = lang_file_path(_fallback_lang())
-        if not os.path.isfile(path):
-            path = lang_file_path(_DEFAULT_LANG)
-        if not os.path.isfile(path):
+        for code in (self.lang, _fallback_lang(), _DEFAULT_LANG):
+            path = os.path.join(_LOCALE_DIR, f"{code}.xml")
+            if os.path.isfile(path):
+                break
+        else:
             return
         try:
             root = _ET.parse(path).getroot()
