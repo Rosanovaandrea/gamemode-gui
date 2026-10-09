@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "title_id": "presentation.title",
+  "subtitle_id": "presentation.subtitle",
+  "blocks": [
+    {
+      "id": "what",
+      "heading_id": "presentation.what.heading",
+      "body_id": "presentation.what.body"
+    },
+    {
+      "id": "why",
+      "heading_id": "presentation.why.heading",
+      "body_id": "presentation.why.body"
+    },
+    {
+      "id": "gamemoderun",
+      "heading_id": "presentation.gamemoderun.heading",
+      "body_id": "presentation.gamemoderun.body"
+    },
+    {
+      "id": "steam",
+      "heading_id": "presentation.steam.heading",
+      "body_id": "presentation.steam.body"
+    },
+    {
+      "id": "lutris",
+      "heading_id": "presentation.lutris.heading",
+      "body_id": "presentation.lutris.body"
+    },
+    {
+      "id": "disclaimer",
+      "heading_id": "presentation.disclaimer.heading",
+      "body_id": "presentation.disclaimer.body",
+      "warning": true
+    }
+  ]
+}

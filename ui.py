@@ -38,7 +38,9 @@ from core import Category, ConfigManager, OptionSpec, tr
 # ===========================================================================
 
 # Schede visibili: le categorie (da options.json) + Riepilogo e Daemon.
-TABS_META = [(cat.id, tr(cat.tab_id)) for cat in core.CATEGORIES] + [
+TABS_META = [("presentation", tr("tab.presentation"))] + [
+    (cat.id, tr(cat.tab_id)) for cat in core.CATEGORIES
+] + [
     ("summary", tr("tab.summary")),
     ("daemon", tr("tab.daemon")),
 ]
@@ -357,6 +359,61 @@ class DaemonTab(Gtk.Box):
 
 
 # ===========================================================================
+# CAPITOLO 5b — scheda Presentazione (contenuti data-driven)
+# ===========================================================================
+
+class PresentationTab(Gtk.Box):
+    """Pagina introduttiva: cos'è GameMode, come usarlo, avvertenze.
+
+    I blocchi e i testi arrivano da ``presentation.json`` + i file di lingua,
+    quindi aggiungere/modificare contenuti non richiede codice.
+    """
+
+    def __init__(self, presentation=None) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.presentation = presentation or core.PRESENTATION
+        pres = self.presentation
+
+        self.append(_header(tr(pres.title_id), tr(pres.subtitle_id)))
+
+        scroller = Gtk.ScrolledWindow(vexpand=True)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        content.set_margin_top(4)
+        content.set_margin_bottom(4)
+        for block in pres.blocks:
+            content.append(_presentation_block(block))
+        scroller.set_child(content)
+        self.append(scroller)
+
+
+def _presentation_block(block) -> Gtk.Widget:
+    """Un blocco della Presentazione: titolo + testo (card con icona se avviso)."""
+    heading = Gtk.Label(label=tr(block.heading_id), xalign=0.0, wrap=True,
+                        css_classes=["heading"])
+    body = Gtk.Label(label=tr(block.body_id), xalign=0.0, wrap=True, selectable=True)
+
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    if block.warning:
+        box.add_css_class("card")
+        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        for margin in ("top", "bottom", "start", "end"):
+            getattr(inner, f"set_margin_{margin}")(12)
+        icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        icon.set_valign(Gtk.Align.START)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        text.set_hexpand(True)
+        text.append(heading)
+        text.append(body)
+        inner.append(icon)
+        inner.append(text)
+        box.append(inner)
+    else:
+        box.append(heading)
+        box.append(body)
+    return box
+
+
+# ===========================================================================
 # CAPITOLO 6 — helper condivisi tra le schede
 # ===========================================================================
 
@@ -503,9 +560,10 @@ class GameModeWindow(Adw.ApplicationWindow):
             self.stack.set_transition_type(
                 Adw.ViewStackTransitionType.SLIDE_LEFT_RIGHT)
 
-        # Schede delle opzioni: una per categoria definita in options.json.
+        # Schede: Presentazione (default) + una per categoria + Riepilogo/Daemon.
         self.option_tabs = {}
-        pages = {}
+        self.presentation_tab = PresentationTab()
+        pages = {"presentation": self.presentation_tab}
         for cat in core.CATEGORIES:
             tab = OptionTab(cat, self.controller, self)
             self.option_tabs[cat.id] = tab
@@ -520,6 +578,9 @@ class GameModeWindow(Adw.ApplicationWindow):
 
         for name, title in TABS_META:
             self.stack.add_titled(pages[name], name, title)
+
+        # All'avvio si apre la Presentazione (prima scheda).
+        self.stack.set_visible_child_name("presentation")
 
         switcher = Adw.ViewSwitcher(stack=self.stack)
         if hasattr(Adw, "ViewSwitcherPolicy"):
@@ -610,7 +671,9 @@ class GameModeWindow(Adw.ApplicationWindow):
         self.controller.load_from_path(self.config_path, self.base_path)
         self._refresh_all()
         self._dirty = False
-        self._show_toast(tr("dlg.save_ok"))
+        # Avvisa che le modifiche hanno effetto solo dopo il riavvio del daemon.
+        self._run_dialog(info_dialog(self, tr("dlg.save_daemon.title"),
+                                     tr("dlg.save_daemon.body")))
 
     def do_restore_backup(self) -> None:
         dlg = confirm_dialog(self, tr("dlg.restore_bak.title"),

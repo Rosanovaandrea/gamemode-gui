@@ -22,6 +22,7 @@
   <entry id="nav.close">Close</entry>
 
   <!-- ===== Tabs ===== -->
+  <entry id="tab.presentation">Introduction</entry>
   <entry id="tab.general">General</entry>
   <entry id="tab.gpu">GPU</entry>
   <entry id="tab.cpu">CPU</entry>
@@ -84,7 +85,8 @@
   <entry id="dlg.unsaved.body">There are unsaved changes. Quit without saving?</entry>
   <entry id="dlg.unsaved.exit">Quit without saving</entry>
 
-  <entry id="dlg.save_ok">Configuration saved successfully.</entry>
+  <entry id="dlg.save_daemon.title">Configuration saved</entry>
+  <entry id="dlg.save_daemon.body">The changes have been written to the file. To take effect you must restart the GameMode daemon from the "Daemon" tab ("Restart gamemoded" button). Until you restart it, the daemon keeps using the previous configuration.</entry>
   <entry id="dlg.save_error.title">Error while saving</entry>
   <entry id="dlg.save_error.body">The write failed and the previous backup was restored.\n\nDetails: {error}</entry>
 
@@ -121,6 +123,28 @@
   <entry id="msg.lang.bad_list">Invalid 'supported_langs' key (expected a list): using the default languages.</entry>
   <entry id="msg.lang.bad_config">Unable to read settings.json: using the default languages.</entry>
   <entry id="msg.lang.empty">No valid language found: using English.</entry>
+
+  <!-- ===== Introduction ===== -->
+  <entry id="presentation.title">Introduction</entry>
+  <entry id="presentation.subtitle">What GameMode is, how to launch games with the optimisations, and what to know before configuring.</entry>
+
+  <entry id="presentation.what.heading">What GameMode is</entry>
+  <entry id="presentation.what.body">GameMode is a set of Linux optimisations applied temporarily (and then reverted) when you launch a game. When a game requests it, the gamemoded daemon changes system settings on the fly such as the CPU governor, process priority, I/O priority, the scheduler and — on supported hardware — the GPU power state. The goal is to reduce stutter and latency and give the game more resources, returning to normal when it exits.</entry>
+
+  <entry id="presentation.why.heading">Why GameMode GUI</entry>
+  <entry id="presentation.why.body">GameMode is configured through the /etc/gamemode.ini file: convenient if you know it, but easy to get wrong (comments, sections, allowed values). This GUI lets you manage every option visually and safely: the file is rewritten in full with atomic writes, backup and restore. Every option has a description of what it does, the benefits and the possible issues.</entry>
+
+  <entry id="presentation.gamemoderun.heading">Launching a game with gamemoderun</entry>
+  <entry id="presentation.gamemoderun.body">The most direct way is to prefix the game's executable with the gamemoderun command. From a terminal, for example:\n\ngamemoderun ./my-game\n\nGameMode enters "game mode" when the process starts and disables it when the game closes. With a wrapper (e.g. DRI_PRIME or optirun) you can combine them: gamemoderun DRI_PRIME=1 ./my-game.</entry>
+
+  <entry id="presentation.steam.heading">Steam</entry>
+  <entry id="presentation.steam.body">In your Steam library: right-click the game → Properties → Launch Options, and write (or replace) with:\n\ngamemoderun %command%\n\n%command% is replaced by Steam with the game's executable, which gamemoderun launches in game mode. This also works with Proton/Windows games.</entry>
+
+  <entry id="presentation.lutris.heading">Lutris</entry>
+  <entry id="presentation.lutris.body">In Lutris, open the game's configuration (right-click → Configure) and in the System options tab enable the "Enable GameMode" option, if available. To do it manually, set a run prefix with gamemoderun, keeping %command% as the game command.</entry>
+
+  <entry id="presentation.disclaimer.heading">Disclaimer</entry>
+  <entry id="presentation.disclaimer.body">Some options (especially the GPU/iGPU ones) may not be supported or may not work correctly on laptops, due to different thermal and power management. In general, changing the governor, platform profiles, GPU power state and system priorities can reduce the machine's stability (crashes, freezes, reboots, overheating). Apply one change at a time, check the result, and keep the "Restore backup" and "Restore original" buttons in the Summary tab within reach. GPU optimisations only take effect if the file is at /etc/gamemode.ini and require the responsibility acceptance switch.</entry>
 
   <!-- ===== Option descriptions ===== -->
   <entry id="opt.general.reaper_freq">How often (in seconds) GameMode's "reaper" thread checks for exited clients, configuration file changes and CPU/iGPU power balancing. Lower values react sooner but use a bit more CPU; higher values are lighter but less responsive. Default: 5.</entry>

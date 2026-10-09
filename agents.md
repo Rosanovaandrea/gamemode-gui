@@ -205,6 +205,7 @@ passati a **6 moduli Python** (più i dati: `options.json`, `style.css`):
 gamemode-gui/
 ├── main.py          entry point (delega a ui.main)
 ├── options.json     definizioni delle opzioni per categoria
+├── presentation.json contenuti della scheda Presentazione (data-driven)
 ├── core.py          logica pura (definizioni, valori speciali, renderer, config, i18n, daemon, sessione)
 ├── ui.py            tutta l'interfaccia GTK, schede generate dai dati
 ├── widgets.py       widget riutilizzabili (build_widget + componenti, vedi 2.8)
@@ -292,22 +293,25 @@ orizzontalmente. Corretti con `halign=START`, `hexpand=False`.
 
 ---
 
-## 4. Flusso utente (6 schede)
+## 4. Flusso utente (7 schede)
 
 | Scheda | Contenuto |
 |------|-----------|
-| 1 | **Generale** (`[general]`): governor, profili, renice, ioprio, ecc. |
-| 2 | **GPU** (`[gpu]`): interruttore "Abilita modifica power plan GPU" + power state NVIDIA/AMD (attivi solo con l'interruttore), con banner di avviso |
-| 3 | **CPU** (`[cpu]`): pinning dei core (checkbox) e parking dei core (switch) |
-| 4 | **Custom** (`[custom]`): card **Notifiche** (due interruttori `toggle_entry` per le notifiche desktop) + script di start/end (liste) + timeout |
-| 5 | **Riepilogo**: anteprima del file completo + Salva, Ripristina backup, Ripristina originale |
-| 6 | **Daemon**: test/riavvio del daemon `gamemoded` + gestione gruppo `gamemode`, con **console simulata** sempre visibile |
+| 1 | **Presentazione** (default all'avvio): cos'è GameMode, perché la GUI, come usare `gamemoderun`/Steam/Lutris, disclaimer. Contenuti data-driven da `presentation.json` + i18n |
+| 2 | **Generale** (`[general]`): governor, profili, renice, ioprio, ecc. |
+| 3 | **GPU** (`[gpu]`): interruttore "Abilita modifica power plan GPU" + power state NVIDIA/AMD (attivi solo con l'interruttore), con banner di avviso |
+| 4 | **CPU** (`[cpu]`): pinning dei core (checkbox) e parking dei core (switch) |
+| 5 | **Custom** (`[custom]`): card **Notifiche** (due interruttori `toggle_entry` per le notifiche desktop) + script di start/end (liste) + timeout |
+| 6 | **Riepilogo**: anteprima del file completo + Salva, Ripristina backup, Ripristina originale |
+| 7 | **Daemon**: test/riavvio del daemon `gamemoded` + gestione gruppo `gamemode`, con **console simulata** sempre visibile |
 
 Navigazione con `Adw.ViewStack` + `Adw.ViewSwitcher` nell'header: si passa
-liberamente da una scheda all'altra senza ordine forzato. Ogni scheda di
-opzioni (Generale, GPU, CPU, Custom) e il Riepilogo hanno il proprio pulsante
-**Salva**, che riscrive comunque l'intero file; la scheda Daemon non salva.
-Stato delle scelte mantenuto in memoria (solo valori).
+liberamente da una scheda all'altra senza ordine forzato (all'avvio si apre la
+Presentazione). Ogni scheda di opzioni (Generale, GPU, CPU, Custom) e il
+Riepilogo hanno il proprio pulsante **Salva**, che riscrive comunque l'intero
+file; la scheda Daemon non salva. Dopo un salvataggio viene mostrato un dialogo
+che ricorda di **riavviare il daemon** (scheda Daemon) perché le modifiche
+abbiano effetto. Stato delle scelte mantenuto in memoria (solo valori).
 
 ---
 

@@ -27,7 +27,7 @@ mkdir -p "$WORK" "$DIST_DIR"
 # ---------------------------------------------------------------------------
 SRCDIR="$WORK/$NAME-$VERSION"
 mkdir -p "$SRCDIR/locale" "$SRCDIR/packaging"
-install -m 644 "$ROOT"/{core.py,ui.py,widgets.py,privileged.py,fileops.py,options.json,style.css,LICENSE} "$SRCDIR/"
+install -m 644 "$ROOT"/{core.py,ui.py,widgets.py,privileged.py,fileops.py,options.json,presentation.json,style.css,LICENSE} "$SRCDIR/"
 install -m 755 "$ROOT/main.py" "$SRCDIR/main.py"
 install -m 644 "$ROOT/locale/it.xml" "$ROOT/locale/en.xml" "$SRCDIR/locale/"
 install -m 644 "$HERE"/io.github.gamemodegui.GameModeGui.desktop \
@@ -53,7 +53,7 @@ build_deb() {
 
     install -m 644 "$ROOT"/core.py "$ROOT"/ui.py "$ROOT"/widgets.py \
         "$ROOT"/privileged.py "$ROOT"/fileops.py "$ROOT"/options.json \
-        "$ROOT"/style.css "$tree/usr/share/$NAME/"
+        "$ROOT"/presentation.json "$ROOT"/style.css "$tree/usr/share/$NAME/"
     install -m 755 "$ROOT/main.py" "$tree/usr/share/$NAME/main.py"
     install -m 644 "$ROOT/locale/it.xml" "$ROOT/locale/en.xml" \
         "$tree/usr/share/$NAME/locale/"

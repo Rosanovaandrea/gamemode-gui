@@ -56,6 +56,7 @@ gamemode-gui/
 ├── main.py           entry point (avvia ui.main)
 ├── options.json      TUTTE le opzioni per categoria (single source of truth,
 │                     data-driven: una voce JSON per opzione)
+├── presentation.json contenuti della scheda Presentazione (data-driven)
 ├── core.py           logica: caricamento definizioni, valori speciali dal
 │                     sistema, renderer, config manager, i18n, sessione
 ├── ui.py             TUTTA l'interfaccia GTK, schede generate dai dati
@@ -125,7 +126,7 @@ Entrambi installano:
 ```
 /usr/bin/gamemode-gui                                        # launcher
 /usr/share/gamemode-gui/{main,core,ui,widgets,privileged,fileops}.py
-/usr/share/gamemode-gui/{options.json,style.css,locale/it.xml,locale/en.xml}
+/usr/share/gamemode-gui/{options.json,presentation.json,style.css,locale/it.xml,locale/en.xml}
 /usr/share/applications/io.github.gamemodegui.GameModeGui.desktop
 /usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
 ```

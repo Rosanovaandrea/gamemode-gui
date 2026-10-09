@@ -5,6 +5,7 @@ L'applicazione è divisa in pochi file, come richiesto nel refactoring:
 
     main.py        → questo file: avvia l'applicazione (delega a ui.main())
     options.json   → tutte le opzioni per categoria (data-driven)
+    presentation.json → contenuti della scheda Presentazione (data-driven)
     core.py        → tutta la logica (definizioni, valori speciali, renderer,
                      config, i18n, utility)
     ui.py          → tutta l'interfaccia GTK (schede generate dai dati)

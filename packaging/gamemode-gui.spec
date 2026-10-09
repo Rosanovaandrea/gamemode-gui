@@ -32,7 +32,7 @@ pinning/parking and GPU optimisations.
 %install
 rm -rf %{buildroot}
 install -d %{buildroot}%{_datadir}/%{name}
-install -m 644 core.py ui.py widgets.py privileged.py fileops.py options.json style.css %{buildroot}%{_datadir}/%{name}/
+install -m 644 core.py ui.py widgets.py privileged.py fileops.py options.json presentation.json style.css %{buildroot}%{_datadir}/%{name}/
 install -m 755 main.py %{buildroot}%{_datadir}/%{name}/main.py
 install -d %{buildroot}%{_datadir}/%{name}/locale
 install -m 644 locale/it.xml locale/en.xml %{buildroot}%{_datadir}/%{name}/locale/

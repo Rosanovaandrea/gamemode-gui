@@ -22,6 +22,7 @@
   <entry id="nav.close">Chiudi</entry>
 
   <!-- ===== Schede ===== -->
+  <entry id="tab.presentation">Presentazione</entry>
   <entry id="tab.general">Generale</entry>
   <entry id="tab.gpu">GPU</entry>
   <entry id="tab.cpu">CPU</entry>
@@ -84,7 +85,8 @@
   <entry id="dlg.unsaved.body">Sono presenti modifiche non salvate. Uscire senza salvare?</entry>
   <entry id="dlg.unsaved.exit">Esci senza salvare</entry>
 
-  <entry id="dlg.save_ok">Configurazione salvata correttamente.</entry>
+  <entry id="dlg.save_daemon.title">Configurazione salvata</entry>
+  <entry id="dlg.save_daemon.body">Le modifiche sono state scritte nel file. Per renderle effettive devi riavviare il daemon GameMode dalla scheda "Daemon" (pulsante "Riavvia gamemoded"). Finché non lo riavvii, il daemon continua a usare la configurazione precedente.</entry>
   <entry id="dlg.save_error.title">Errore durante il salvataggio</entry>
   <entry id="dlg.save_error.body">La scrittura è fallita ed è stato ripristinato il backup precedente.\n\nDettagli: {error}</entry>
 
@@ -121,6 +123,28 @@
   <entry id="msg.lang.bad_list">Chiave 'supported_langs' non valida (attesa una lista): uso le lingue predefinite.</entry>
   <entry id="msg.lang.bad_config">Impossibile leggere settings.json: uso le lingue predefinite.</entry>
   <entry id="msg.lang.empty">Nessuna lingua valida trovata: uso l'inglese.</entry>
+
+  <!-- ===== Presentazione ===== -->
+  <entry id="presentation.title">Presentazione</entry>
+  <entry id="presentation.subtitle">Cos'è GameMode, come avviare i giochi con le ottimizzazioni e cosa sapere prima di configurare.</entry>
+
+  <entry id="presentation.what.heading">Cos'è GameMode</entry>
+  <entry id="presentation.what.body">GameMode è un insieme di ottimizzazioni per Linux applicate temporaneamente (e poi ripristinate) quando avvii un gioco. Quando un gioco lo richiede, il daemon gamemoded modifica al volo impostazioni di sistema come il governor della CPU, la priorità dei processi, la priorità I/O, lo scheduler e — su hardware compatibile — lo stato di potenza della GPU. L'obiettivo è ridurre stutter e latenza e dare più risorse al gioco, tornando alla normalità alla chiusura.</entry>
+
+  <entry id="presentation.why.heading">Perché GameMode GUI</entry>
+  <entry id="presentation.why.body">GameMode si configura tramite il file /etc/gamemode.ini: comodo per chi lo conosce, ma facile da sbagliare (commenti, sezioni, valori ammessi). Questa GUI permette di gestire tutte le opzioni in modo visuale e sicuro: il file viene riscritto per intero con scrittura atomica, backup e ripristino. Ogni opzione ha una descrizione di cosa fa, dei benefici e dei possibili problemi.</entry>
+
+  <entry id="presentation.gamemoderun.heading">Avviare un gioco con gamemoderun</entry>
+  <entry id="presentation.gamemoderun.body">Il modo più diretto è anteporre il comando gamemoderun all'eseguibile del gioco. Da terminale, ad esempio:\n\ngamemoderun ./mio-gioco\n\nGameMode entra in "modalità gioco" all'avvio del processo e la disattiva quando il gioco si chiude. Con un wrapper (es. DRI_PRIME o optirun) puoi combinarli: gamemoderun DRI_PRIME=1 ./mio-gioco.</entry>
+
+  <entry id="presentation.steam.heading">Steam</entry>
+  <entry id="presentation.steam.body">Nella libreria di Steam: tasto destro sul gioco → Proprietà → Opzioni di avvio, e scrivi (o sostituisci) con:\n\ngamemoderun %command%\n\n%command% viene sostituito da Steam con l'eseguibile del gioco, che gamemoderun avvia in modalità gioco. Funziona anche con i giochi Proton/Windows.</entry>
+
+  <entry id="presentation.lutris.heading">Lutris</entry>
+  <entry id="presentation.lutris.body">In Lutris apri la configurazione del gioco (tasto destro → Configure) e nella scheda System options attiva l'opzione "Enable GameMode", se disponibile. Per farlo a mano, imposta un prefisso di esecuzione con gamemoderun lasciando %command% come comando del gioco.</entry>
+
+  <entry id="presentation.disclaimer.heading">Avviso</entry>
+  <entry id="presentation.disclaimer.body">Alcune opzioni (in particolare quelle GPU/iGPU) potrebbero non essere supportate o non funzionare correttamente sui computer portatili, per via di gestione termica e di alimentazione diversa. In generale, modificare governor, profili di piattaforma, stato di potenza della GPU e priorità di sistema può ridurre la stabilità della macchina (crash, freeze, riavvii, surriscaldamento). Applica una modifica alla volta, verifica il risultato e tieni a portata di mano i pulsanti "Ripristina backup" e "Ripristina originale" nella scheda Riepilogo. Le ottimizzazioni GPU hanno effetto solo se il file è in /etc/gamemode.ini e richiedono l'interruttore di accettazione della responsabilità.</entry>
 
   <!-- ===== Descrizioni opzioni ===== -->
   <entry id="opt.general.reaper_freq">Ogni quanti secondi il thread "reaper" di GameMode controlla client terminati, modifiche al file di configurazione e bilanciamento CPU/iGPU. Valori bassi reagiscono prima ma usano un po' più di CPU; valori alti sono più leggeri ma meno reattivi. Default: 5.</entry>

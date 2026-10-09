@@ -41,6 +41,10 @@ def exercise(*_):
     results.append(("config_path", resolve_config_path()))
     results.append(("tabs_count", win.stack.get_pages().get_n_items()))
     results.append(("default_tab", win.stack.get_visible_child_name()))
+    results.append(("presentation_default",
+                    win.stack.get_visible_child_name() == "presentation"))
+    results.append(("presentation_blocks",
+                    len(win.presentation_tab.presentation.blocks)))
 
     # modifica un'opzione nella scheda Generale (nessun "Includi" da attivare)
     first = win.general_tab.rows[0]

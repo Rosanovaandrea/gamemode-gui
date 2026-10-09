@@ -315,7 +315,8 @@ class Translator:
         for entry in root.findall("entry"):
             key = entry.get("id")
             if key is not None and entry.text:
-                self._strings[key] = entry.text.strip()
+                # I file XML usano la sequenza "\n" per andare a capo.
+                self._strings[key] = entry.text.strip().replace("\\n", "\n")
 
     def tr(self, key: str) -> str:
         return self._strings.get(key, key)
@@ -492,6 +493,63 @@ TOGGLE_ENTRIES_BY_TARGET: Dict[str, List[OptionSpec]] = {}
 for _spec in OPTIONS:
     if _spec.type == "toggle_entry" and _spec.target:
         TOGGLE_ENTRIES_BY_TARGET.setdefault(_spec.target, []).append(_spec)
+
+
+# ===========================================================================
+# 2b. PRESENTAZIONE (contenuti data-driven, come options.json)
+# ===========================================================================
+# La scheda "Presentazione" non contiene opzioni: è una pagina di testo divisa
+# in blocchi. La struttura (quali blocchi, in che ordine, quali sono di avviso)
+# vive in presentation.json, mentre i testi veri stanno nei file di lingua
+# (approccio data-driven + i18n). Aggiungere un blocco = voce JSON + chiavi i18n.
+
+_PRESENTATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "presentation.json")
+
+
+@dataclass(frozen=True)
+class PresentationBlock:
+    """Un blocco della presentazione: titolo + testo (+ eventuale avviso)."""
+
+    id: str
+    heading_id: str
+    body_id: str
+    warning: bool = False
+
+
+@dataclass(frozen=True)
+class Presentation:
+    """Contenuto della scheda Presentazione (titolo, sottotitolo, blocchi)."""
+
+    title_id: str
+    subtitle_id: str
+    blocks: tuple
+
+
+def load_presentation(path: str = _PRESENTATION_FILE) -> Presentation:
+    """Carica i blocchi della Presentazione da ``presentation.json``."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return Presentation("presentation.title", "presentation.subtitle", ())
+    blocks = tuple(
+        PresentationBlock(
+            id=str(block.get("id", "")),
+            heading_id=block.get("heading_id", ""),
+            body_id=block.get("body_id", ""),
+            warning=bool(block.get("warning", False)),
+        )
+        for block in data.get("blocks", [])
+    )
+    return Presentation(
+        title_id=data.get("title_id", "presentation.title"),
+        subtitle_id=data.get("subtitle_id", "presentation.subtitle"),
+        blocks=blocks,
+    )
+
+
+PRESENTATION: Presentation = load_presentation()
 
 
 # ===========================================================================
