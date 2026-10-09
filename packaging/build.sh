@@ -14,8 +14,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 NAME="gamemode-gui"
-VERSION="1.0.0"
-RELEASE="1"
+VERSION="${VERSION:-1.0.0}"
+RELEASE="${RELEASE:-1}"
 DIST_DIR="$ROOT/dist"
 WORK="$DIST_DIR/_work"
 
@@ -75,9 +75,9 @@ Priority: optional
 Architecture: all
 Maintainer: GameMode GUI contributors <noreply@example.com>
 Installed-Size: $size
-Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gamemode, pkexec | policykit-1
+Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gamemode-daemon | gamemode, pkexec | policykit-1
 Recommends: sudo
-Homepage: https://github.com/gamemode-gui/gamemode-gui
+Homepage: https://github.com/Rosanovaandrea/gamemode-gui
 Description: GUI to configure Feral GameMode
  A GTK4 + Libadwaita desktop application to manage gamemode.ini in a
  visual, safe and atomic way.
@@ -86,6 +86,20 @@ EOF
     cat > "$tree/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
+
+# --- RESET configurazione (comportamento temporaneo) -------------------------
+# All'installazione/aggiornamento azzera la configurazione gestita dalla GUI:
+#   * /etc/gamemode.ini e i suoi file di servizio (.orig/.bak/.tmp/.session.json)
+#   * le preferenze utente (~/.config/gamemode-gui/settings.json)
+# Così la nuova versione riparte sempre da uno stato pulito.
+rm -f /etc/gamemode.ini /etc/gamemode.ini.orig /etc/gamemode.ini.bak \
+      /etc/gamemode.ini.tmp /etc/gamemode.ini.session.json
+for home in /root /home/*; do
+    [ -d "$home" ] || continue
+    rm -f "$home/.config/gamemode-gui/settings.json"
+done
+
+# --- Cache desktop / icone ---------------------------------------------------
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q /usr/share/applications || true
 fi
@@ -118,6 +132,10 @@ build_rpm() {
     mkdir -p "$top/BUILD" "$top/RPMS" "$top/SOURCES" "$top/SPECS" "$top/SRPMS" "$top/BUILDROOT"
     install -m 644 "$WORK/$NAME-$VERSION.tar.gz" "$top/SOURCES/"
     install -m 644 "$HERE/gamemode-gui.spec" "$top/SPECS/gamemode-gui.spec"
+    # Allinea la Version/Release dello spec a quelle usate per il tarball
+    # (così il tag git, il nome del tarball e la versione RPM coincidono).
+    sed -i "s/^Version:.*/Version:        $VERSION/" "$top/SPECS/gamemode-gui.spec"
+    sed -i "s/^Release:.*/Release:        ${RELEASE}%{?dist}/" "$top/SPECS/gamemode-gui.spec"
 
     local cmd=()
     if command -v rpmbuild >/dev/null 2>&1; then

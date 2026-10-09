@@ -116,6 +116,9 @@
   <entry id="msg.cmd_not_found">Comando non trovato</entry>
   <entry id="msg.timeout">Timeout dopo {timeout}s</entry>
   <entry id="msg.no_priv_frontend">Nessun frontend privilegiato disponibile</entry>
+  <entry id="msg.gamemode_not_installed">GameMode non risulta installato (gamemoded non trovato nel PATH)</entry>
+  <entry id="msg.no_systemd">Né systemctl né pkill disponibili: impossibile riavviare il daemon</entry>
+  <entry id="msg.usermod_missing">Comando 'usermod' non trovato (pacchetto shadow/shadow-utils)</entry>
 
   <!-- ===== Errori configurazione lingue ===== -->
   <entry id="msg.lang.missing_file">Lingua '{lang}' ignorata: manca il file locale/{lang}.xml.</entry>

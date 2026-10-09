@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        GUI for configuring Feral GameMode
 
 License:        MIT
-URL:            https://github.com/gamemode-gui/gamemode-gui
+URL:            https://github.com/Rosanovaandrea/gamemode-gui
 Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 
@@ -15,6 +15,12 @@ Requires:       libadwaita
 Requires:       gamemode
 Requires:       polkit
 Recommends:     sudo
+
+# Pacchetto noarch di soli script/dati Python: non servono le elaborazioni
+# post-install (strip, bytecompile, mangle-shebang). Evita dipendenze dal brp
+# e rende la build riproducibile anche dove gli helper rpm non sono completi.
+%global __os_install_post %{nil}
+%global __arch_install_post %{nil}
 
 %description
 A GTK4 + Libadwaita desktop application to manage the Feral GameMode
@@ -52,6 +58,17 @@ install -d %{buildroot}%{_datadir}/licenses/%{name}
 install -m 644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 
 %post
+# --- RESET configurazione (comportamento temporaneo) -------------------------
+# All'installazione/aggiornamento azzera la configurazione gestita dalla GUI:
+#   * /etc/gamemode.ini e i suoi file di servizio (.orig/.bak/.tmp/.session.json)
+#   * le preferenze utente (~/.config/gamemode-gui/settings.json)
+rm -f /etc/gamemode.ini /etc/gamemode.ini.orig /etc/gamemode.ini.bak \
+      /etc/gamemode.ini.tmp /etc/gamemode.ini.session.json
+for home in /root /home/*; do
+    [ -d "$home" ] || continue
+    rm -f "$home/.config/gamemode-gui/settings.json"
+done
+
 if [ -x %{_bindir}/update-desktop-database ]; then
     %{_bindir}/update-desktop-database -q %{_datadir}/applications || :
 fi

@@ -718,7 +718,7 @@ class GameModeWindow(Adw.ApplicationWindow):
         res = core.add_user_to_group()
         console = self.daemon_tab
         console.append_console(tr("daemon.console.cmd").format(
-            cmd=f"usermod -aG gamemode {user}"))
+            cmd=res.command or f"usermod -aG gamemode {user}"))
         console.append_console(res.output)
         if res.success:
             console.append_console(tr("dlg.logout.body"))
@@ -729,18 +729,19 @@ class GameModeWindow(Adw.ApplicationWindow):
         res = core.restart_daemon()
         console = self.daemon_tab
         console.append_console(tr("daemon.console.cmd").format(
-            cmd="systemctl --user restart gamemoded"))
+            cmd=res.command or "systemctl --user restart gamemoded"))
         console.append_console(res.output)
 
     def run_tests(self) -> None:
         """Esegue i comandi di test del daemon e ne mostra l'output in console."""
         console = self.daemon_tab
         res_test = core.test_daemon()
-        console.append_console(tr("daemon.console.cmd").format(cmd="gamemoded -t"))
+        console.append_console(tr("daemon.console.cmd").format(
+            cmd=res_test.command or "gamemoded -t"))
         console.append_console(res_test.output)
         res_ver = core.daemon_version()
         console.append_console(tr("daemon.console.cmd").format(
-            cmd="gamemoderun --version"))
+            cmd=res_ver.command or "gamemoded --version"))
         console.append_console(res_ver.output)
 
     def _show_help(self) -> None:

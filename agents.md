@@ -325,8 +325,30 @@ abbiano effetto. Stato delle scelte mantenuto in memoria (solo valori).
 - **Gruppo `gamemode`**: verifica appartenenza; pulsante "Aggiungi al gruppo"
   che esegue `usermod -aG gamemode $USER` via pkexec; promemoria di
   logout/login dopo l'aggiunta (mostrato **solo in caso di successo**).
+- **Portabilità Debian/RPM**: i binari (`gamemoded`, `systemctl`, `usermod`,
+  `pkexec`, `sudo`, `pkill`) sono risolti con percorsi assoluti
+  (`shutil.which` + fallback noti), così funzionano anche con PATH minimo
+  (es. sotto `pkexec`) o layout diversi (`/usr/sbin` vs `/sbin`, merged-usr). La
+  versione si legge da **`gamemoded --version`** (NON `gamemoderun --version`,
+  che è uno script che esegue il comando passato e non gestisce `--version`). Il
+  riavvio usa l'unità systemd **utente** (`systemctl --user restart gamemoded`,
+  come installata da GameMode) con fallback all'unità di sistema e poi a
+  `pkill`. I governor CPU si leggono da **tutti** i file
+  `.../cpu*/cpufreq/scaling_available_governors` (non solo cpu0).
 
 Tutti i comandi usano liste di argomenti (`subprocess`), mai `shell=True`.
+
+### 5.1 Packaging e release automatiche
+
+- **`packaging/build.sh`** genera `.deb` e `.rpm` in `dist/`; `VERSION`/`RELEASE`
+  sono sovrascrivibili da ambiente (in CI la versione arriva dal tag git).
+- **Reset temporaneo**: i post-install (deb `postinst`, rpm `%post`) azzerano
+  `/etc/gamemode.ini` (+ `.orig`/`.bak`/`.tmp`/`.session.json`) e le preferenze
+  utente `~/.config/gamemode-gui/settings.json` a ogni install/upgrade.
+- **CI**: `.github/workflows/build-packages.yml` costruisce i pacchetti e, su
+  push di un tag `vX.Y.Z`, li pubblica nella sezione **Releases** di GitHub
+  (artefatti allegati alla release; versione presa dal tag). `workflow_dispatch`
+  costruisce e carica gli artifact senza creare la release.
 
 ---
 

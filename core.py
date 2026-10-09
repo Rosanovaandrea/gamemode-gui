@@ -18,9 +18,11 @@ Nessuna dipendenza GTK qui dentro: la logica è testabile senza display.
 from __future__ import annotations
 
 import getpass
+import glob
 import grp
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -628,20 +630,28 @@ def load_base_comments(path: Optional[str]) -> Dict[str, str]:
 # vanno ricavate da fattori esterni. Per queste `special` è true e
 # `special_source` indica la sorgente.
 
-_SYSFS_GOVERNORS = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+_GOVERNORS_GLOB = "/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_governors"
 _FALLBACK_GOVERNORS = ["performance", "powersave", "ondemand", "conservative", "schedutil"]
 
 
 def get_cpu_governors() -> List[str]:
-    """Elenca i governor CPU disponibili sul sistema (con fallback statico)."""
-    try:
-        with open(_SYSFS_GOVERNORS, "r", encoding="utf-8") as fh:
-            governors = fh.read().split()
-        if governors:
-            return governors
-    except OSError:
-        pass
-    return list(_FALLBACK_GOVERNORS)
+    """Elenca i governor CPU disponibili sul sistema (con fallback statico).
+
+    Scansiona tutti i file ``scaling_available_governors`` delle CPU (come fa
+    GameMode), così funziona anche con politiche cpufreq eterogenee (P-core/E-core,
+    big.LITTLE) e su qualsiasi distribuzione. Un governor elencato da più CPU
+    compare una volta sola.
+    """
+    governors: List[str] = []
+    for path in glob.glob(_GOVERNORS_GLOB):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                for gov in fh.read().split():
+                    if gov not in governors:
+                        governors.append(gov)
+        except OSError:
+            continue
+    return governors or list(_FALLBACK_GOVERNORS)
 
 
 SPECIAL_SOURCES: Dict[str, Callable[[], List[str]]] = {
@@ -979,6 +989,34 @@ def load_effective_values(base_path: Optional[str],
 #   via pkexec (o sudo). In ogni caso l'operazione è atomica e con rollback.
 # - target in un percorso scrivibile (es. .config per test): operazione locale.
 
+def _which(name: str, *fallbacks: str) -> Optional[str]:
+    """Trova un eseguibile: prima nel PATH, poi tra percorsi assoluti noti.
+
+    Restituisce un percorso assoluto, così i comandi funzionano anche quando il
+    PATH è minimo (es. sotto ``pkexec``) o cambia tra distribuzioni (``/usr/sbin``
+    vs ``/sbin``, merged-usr, ecc.). ``None`` se non trovato.
+    """
+    path = shutil.which(name)
+    if path:
+        return path
+    for candidate in fallbacks:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _privileged_prefixes() -> List[List[str]]:
+    """Prefissi privilegiati disponibili, in ordine (pkexec, poi sudo)."""
+    prefixes: List[List[str]] = []
+    pkexec = _which("pkexec", "/usr/bin/pkexec", "/usr/sbin/pkexec")
+    if pkexec:
+        prefixes.append([pkexec])
+    sudo = _which("sudo", "/usr/bin/sudo", "/bin/sudo", "/usr/sbin/sudo")
+    if sudo:
+        prefixes.append([sudo, "-n"])
+    return prefixes
+
+
 def _privileged_argv(command: str, path: str,
                      extra_args: Optional[List[str]] = None) -> List[str]:
     """Costruisce la riga di comando per l'helper privilegiato."""
@@ -990,7 +1028,7 @@ def run_privileged(command: str, path: str, content: str = "", timeout: int = 60
                    extra_args: Optional[List[str]] = None) -> subprocess.CompletedProcess:
     """Esegue un'operazione privilegiata provando pkexec poi sudo."""
     argv = _privileged_argv(command, path, extra_args)
-    for prefix in (["pkexec"], ["sudo", "-n"]):
+    for prefix in _privileged_prefixes():
         try:
             return subprocess.run(
                 prefix + argv, input=content, capture_output=True,
@@ -1117,6 +1155,7 @@ class CommandResult:
     stdout: str = ""
     stderr: str = ""
     error: str = ""
+    command: str = ""
 
     @property
     def output(self) -> str:
@@ -1131,30 +1170,69 @@ class CommandResult:
 
 
 def _run(argv: List[str], timeout: int = 30) -> CommandResult:
+    command = " ".join(argv)
     try:
         proc = subprocess.run(argv, capture_output=True, text=True,
                               timeout=timeout, check=False)
         return CommandResult(proc.returncode == 0, proc.returncode,
-                             proc.stdout, proc.stderr)
+                             proc.stdout, proc.stderr, command=command)
     except FileNotFoundError as exc:
-        return CommandResult(False, -1, error=f"{tr('msg.cmd_not_found')}: {exc}")
+        return CommandResult(False, -1, error=f"{tr('msg.cmd_not_found')}: {exc}",
+                             command=command)
     except subprocess.TimeoutExpired as exc:
         return CommandResult(False, -1, error=tr("msg.timeout"),
-                             stdout=exc.stdout or "", stderr=exc.stderr or "")
+                             stdout=exc.stdout or "", stderr=exc.stderr or "",
+                             command=command)
     except OSError as exc:
-        return CommandResult(False, -1, error=str(exc))
+        return CommandResult(False, -1, error=str(exc), command=command)
+
+
+def _gamemoded_path() -> Optional[str]:
+    return _which("gamemoded", "/usr/bin/gamemoded", "/usr/local/bin/gamemoded")
 
 
 def test_daemon() -> CommandResult:
-    return _run(["gamemoded", "-t"])
+    """Esegue i test diagnostici del daemon (``gamemoded -t``)."""
+    gamemoded = _gamemoded_path()
+    if not gamemoded:
+        return CommandResult(False, -1, error=tr("msg.gamemode_not_installed"),
+                             command="gamemoded -t")
+    return _run([gamemoded, "-t"])
 
 
 def daemon_version() -> CommandResult:
-    return _run(["gamemoderun", "--version"])
+    """Versione di GameMode (``gamemoded --version``).
+
+    Nota: NON si usa ``gamemoderun --version`` perché ``gamemoderun`` è uno
+    script che esegue il comando passato (con LD_PRELOAD) e non gestisce
+    ``--version``: la versione la stampa ``gamemoded``.
+    """
+    gamemoded = _gamemoded_path()
+    if not gamemoded:
+        return CommandResult(False, -1, error=tr("msg.gamemode_not_installed"),
+                             command="gamemoded --version")
+    return _run([gamemoded, "--version"])
 
 
 def restart_daemon() -> CommandResult:
-    return _run(["systemctl", "--user", "restart", "gamemoded"])
+    """Riavvia gamemoded.
+
+    GameMode installa ``gamemoded.service`` come unità systemd **utente**
+    (``systemctl --user``). Su sistemi con l'unità di sistema si prova anche
+    quella; senza systemd si ripiega su ``pkill`` (il daemon è attivato via
+    D-Bus e riparte alla prossima richiesta).
+    """
+    systemctl = _which("systemctl", "/usr/bin/systemctl", "/bin/systemctl")
+    if systemctl:
+        res_user = _run([systemctl, "--user", "restart", "gamemoded"])
+        if res_user.success:
+            return res_user
+        res_system = _run([systemctl, "restart", "gamemoded"])
+        return res_system if res_system.success else res_user
+    pkill = _which("pkill", "/usr/bin/pkill", "/bin/pkill")
+    if pkill:
+        return _run([pkill, "-TERM", "gamemoded"])
+    return CommandResult(False, -1, error=tr("msg.no_systemd"))
 
 
 def group_exists() -> bool:
@@ -1173,14 +1251,21 @@ def user_in_group(user: Optional[str] = None) -> bool:
 
 
 def add_user_to_group() -> CommandResult:
+    """Aggiunge l'utente al gruppo ``gamemode`` (``usermod -aG``), con privilegi."""
     user = getpass.getuser()
-    argv = ["usermod", "-aG", "gamemode", user]
-    for prefix in (["pkexec"], ["sudo", "-n"]):
-        try:
-            return _run(prefix + argv, timeout=60)
-        except subprocess.SubprocessError:
-            continue
-    return CommandResult(False, -1, error=tr("msg.no_priv_frontend"))
+    usermod = _which("usermod", "/usr/sbin/usermod", "/sbin/usermod")
+    if not usermod:
+        return CommandResult(False, -1, error=tr("msg.usermod_missing"),
+                             command=f"usermod -aG gamemode {user}")
+    argv = [usermod, "-aG", "gamemode", user]
+    last = CommandResult(False, -1, error=tr("msg.no_priv_frontend"),
+                         command=" ".join(argv))
+    for prefix in _privileged_prefixes():
+        res = _run(prefix + argv, timeout=60)
+        if res.success:
+            return res
+        last = res
+    return last
 
 
 # ===========================================================================

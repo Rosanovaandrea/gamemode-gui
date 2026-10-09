@@ -117,7 +117,8 @@ packaging/build.sh
 ```
 
 - **`.deb`** (Debian/Ubuntu): `Depends: python3, python3-gi, gir1.2-gtk-4.0,
-  gir1.2-adw-1, gamemode` (più `pkexec | policykit-1`; `Recommends: sudo`).
+  gir1.2-adw-1, gamemode-daemon | gamemode` (più `pkexec | policykit-1`;
+  `Recommends: sudo`).
 - **`.rpm`** (Fedora/RHEL): `Requires: python3, python3-gobject, gtk4,
   libadwaita, gamemode, polkit` (più `Recommends: sudo`).
 
@@ -131,10 +132,32 @@ Entrambi installano:
 /usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
 ```
 
+> **Reset della configurazione (temporaneo):** a ogni installazione o
+> aggiornamento del pacchetto, lo script di post-installazione **azzera** la
+> configurazione gestita dalla GUI — `/etc/gamemode.ini` con i suoi file di
+> servizio (`.orig`, `.bak`, `.tmp`, `.session.json`) e le preferenze utente
+> `~/.config/gamemode-gui/settings.json` — così la nuova versione riparte
+> sempre da uno stato pulito.
+
 Dopo l'installazione l'app compare nel menu (icona standard "GameMode GUI") e si
 avvia da lì o con il comando `gamemode-gui`. Per l'RPM serve `rpmbuild`
 (pacchetto `rpm-build`); in mancanza si può indicare un binario con
 `RPMBUILD=/path/rpmbuild packaging/build.sh`.
+
+### Release automatiche (GitHub Actions)
+
+Il workflow `.github/workflows/build-packages.yml` costruisce `gamemode-gui`
+per il rilascio:
+
+- **Su push di un tag** `vX.Y.Z` (es. `git tag v1.2.3 && git push origin v1.2.3`):
+  costruisce il `.deb` e l'.rpm e li **pubblica nella sezione Releases** di
+  GitHub, allegandoli alla release del tag. La versione dei pacchetti viene presa
+  dal tag (sovrascrivendo i default di `packaging/build.sh` tramite `VERSION`).
+- **Manualmente** (`workflow_dispatch`, dalla scheda "Actions"): costruisce e
+  carica i pacchetti come artifact, senza creare una release.
+
+I pacchetti vengono costruiti su `ubuntu-latest` installando `dpkg-dev` e `rpm`
+(`rpmbuild`).
 
 ## Quale file configura la GUI (e quali legge il daemon)
 
