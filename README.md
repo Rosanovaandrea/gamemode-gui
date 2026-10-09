@@ -39,3 +39,87 @@ In Lutris, open the game's configuration (right-click → Configure) and in the 
 ## Disclaimer
 
 Some options (especially the GPU/iGPU ones) may not be supported or may not work correctly on laptops, due to different thermal and power management. In general, changing the governor, platform profiles, GPU power state and system priorities can reduce the machine's stability (crashes, freezes, reboots, overheating). Apply one change at a time, check the result, and keep the "Restore backup" and "Restore original" buttons in the Summary tab within reach. GPU optimisations only take effect if the file is at /etc/gamemode.ini and require the responsibility acceptance switch.
+
+## Building
+
+### Dependencies
+
+- Python 3.10+
+- PyGObject (GTK 4 + libadwaita)
+- Feral GameMode (the daemon the GUI configures)
+- `pkexec` (polkit) or `sudo` for the privileged writes to `/etc`
+
+```bash
+# Fedora / RHEL
+sudo dnf install python3-gobject gtk4 libadwaita gamemode
+
+# Debian / Ubuntu
+sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gamemode
+```
+
+### Run from source
+
+```bash
+cd gamemode-gui
+python3 main.py
+```
+
+The first write to `/etc/gamemode.ini` asks for the administrator password (via `pkexec`, with `sudo` as fallback). To try it without touching `/etc` (temporary writable path):
+
+```bash
+GAMEMODE_CONFIG=/tmp/try/gamemode.ini python3 main.py
+```
+
+### Tests
+
+```bash
+python3 test_core.py    # logic, no display
+python3 smoke_test.py   # interface (needs DISPLAY), uses a temporary folder
+```
+
+### Build the packages (`.deb` / `.rpm`)
+
+`packaging/build.sh` builds both packages into `dist/`. There is no compilation: it is a pure Python/GTK package.
+
+```bash
+packaging/build.sh
+```
+
+Requirements: `dpkg-deb` (package `dpkg-dev`/`dpkg`) for the `.deb`; `rpmbuild` (package `rpm-build`) for the `.rpm`. If `rpmbuild` is not in the `PATH`, point at an alternative binary and its config dir:
+
+```bash
+RPMBUILD=/path/usr/bin/rpmbuild RPMCONF=/path/rpmconf packaging/build.sh
+```
+
+`VERSION` and `RELEASE` can be overridden from the environment (defaults `1.0.0` and `1`); in CI the version comes from the git tag.
+
+Package metadata:
+
+- **`.deb`** (Debian/Ubuntu): `Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gamemode-daemon | gamemode` (plus `pkexec | policykit-1`; `Recommends: sudo`).
+- **`.rpm`** (Fedora/RHEL): `Requires: python3, python3-gobject, gtk4, libadwaita, gamemode, polkit` (plus `Recommends: sudo`).
+
+Both install:
+
+```text
+/usr/bin/gamemode-gui                                        # launcher
+/usr/share/gamemode-gui/                                     # application files
+/usr/share/gamemode-gui/locale/{it,en}.xml                   # translations
+/usr/share/applications/io.github.gamemodegui.GameModeGui.desktop
+/usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
+```
+
+> **Configuration reset (temporary):** on every installation or upgrade the
+> post-install script **wipes** the configuration managed by the GUI —
+> `/etc/gamemode.ini` with its service files (`.orig`, `.bak`, `.tmp`,
+> `.session.json`) and the user preferences
+> `~/.config/gamemode-gui/settings.json` — so the new version always starts from a
+> clean state.
+
+### Automatic releases (GitHub Actions)
+
+`.github/workflows/build-packages.yml` builds the packages for a release:
+
+- **On pushing a tag** `vX.Y.Z` (e.g. `git tag v1.2.3 && git push origin v1.2.3`): it builds the `.deb` and the `.rpm` and **publishes them in the GitHub Releases** section, attached to the tag's release. The package version is taken from the tag (overriding the defaults of `packaging/build.sh` via `VERSION`).
+- **Manually** (`workflow_dispatch`, from the "Actions" tab): it builds and uploads the packages as artifacts, without creating a release.
+
+The packages are built on `ubuntu-latest` installing `dpkg-dev` and `rpm` (`rpmbuild`).
