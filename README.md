@@ -1,121 +1,39 @@
-# GUI di Configurazione per Feral GameMode
+# Introduction
 
-Applicazione desktop (GTK4 + Libadwaita) per gestire in modo visuale, sicuro
-e intuitivo il file `gamemode.ini` del daemon **Feral GameMode**.
+What GameMode is, how to launch games with the optimisations, and what to know before configuring
 
-## Struttura
+## What GameMode is
 
-```
-gamemode-gui/
-├── main.py           entry point (avvia ui.main)
-├── options.json      TUTTE le opzioni per categoria (single source of truth,
-│                     data-driven: una voce JSON per opzione)
-├── core.py           logica: caricamento definizioni, valori speciali dal
-│                     sistema, renderer, config manager, i18n, sessione
-├── ui.py             TUTTA l'interfaccia GTK, schede generate dai dati
-├── widgets.py        widget riutilizzabili: build_widget (per tipo),
-│                     ChoicePicker (radio, niente dropdown), StepperBox (-/+),
-│                     ListEditor, OptionRow (nome+descrizione su una riga)
-├── privileged.py     helper eseguito come root (pkexec/sudo) per scrivere /etc
-├── locale/it.xml     traduzioni (italiano, configurabile)
-├── test_core.py      test della logica (senza GUI)
-└── smoke_test.py     test dell'interfaccia (richiede DISPLAY, usa cartella
-                      temporanea, non tocca la config reale)
-```
+GameMode is a set of Linux optimisations applied temporarily (and then reverted) when you launch a game. When a game requests it, the gamemoded daemon changes system settings on the fly such as the CPU governor, process priority, I/O priority, the scheduler and — on supported hardware — the GPU power state. The goal is to reduce stutter and latency and give the game more resources, returning to normal when it exits.
 
-## Dipendenze
+## Why GameMode GUI
 
-- Python 3.10+
-- PyGObject (GTK4, libadwaita)
+GameMode is configured through the /etc/gamemode.ini file: convenient if you know it, but easy to get wrong (comments, sections, allowed values). This GUI lets you manage every option visually and safely: the file is rewritten in full with atomic writes, backup and restore. Every option has a description of what it does, the benefits and the possible issues.
+
+## Launching a game with gamemoderun
+
+The most direct way is to prefix the game's executable with the gamemoderun command. From a terminal, for example:
 
 ```bash
-# Fedora
-sudo dnf install python3-gobject gtk4 libadwaita
-# Debian/Ubuntu
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1
+gamemoderun ./my-game
 ```
 
-## Esecuzione
+GameMode enters "game mode" when the process starts and disables it when the game closes. With a wrapper (e.g. DRI_PRIME or optirun) you can combine them: gamemoderun DRI_PRIME=1 ./my-game.
 
-```bash
-cd gamemode-gui
-python3 main.py
+## Steam
+
+In your Steam library: right-click the game → Properties → Launch Options, and write (or replace) with:
+
+```text
+gamemoderun %command%
 ```
 
-La prima scrittura in `/etc/gamemode.ini` richiede la password amministratore
-(via `pkexec`, con fallback `sudo`).
+%command% is replaced by Steam with the game's executable, which gamemoderun launches in game mode. This also works with Proton/Windows games.
 
-Per provare senza toccare `/etc` (percorso scrivibile temporaneo):
+## Lutris
 
-```bash
-GAMEMODE_CONFIG=/tmp/prova/gamemode.ini python3 main.py
-```
+In Lutris, open the game's configuration (right-click → Configure) and in the System options tab enable the "Enable GameMode" option, if available. To do it manually, set a run prefix with gamemoderun, keeping %command% as the game command.
 
-## Test
+## Disclaimer
 
-```bash
-python3 test_core.py    # logica, senza display
-python3 smoke_test.py   # interfaccia (serve DISPLAY), usa cartella temporanea
-```
-
-## Pacchetti (`.deb` / `.rpm`)
-
-Lo script `packaging/build.sh` genera entrambi i pacchetti in `dist/`:
-
-```bash
-packaging/build.sh
-```
-
-- **`.deb`** (Debian/Ubuntu): `Depends: python3, python3-gi, gir1.2-gtk-4.0,
-  gir1.2-adw-1, gamemode` (più `pkexec | policykit-1`; `Recommends: sudo`).
-- **`.rpm`** (Fedora/RHEL): `Requires: python3, python3-gobject, gtk4,
-  libadwaita, gamemode, polkit` (più `Recommends: sudo`).
-
-Entrambi installano:
-
-```
-/usr/bin/gamemode-gui                                        # launcher
-/usr/share/gamemode-gui/{main,core,ui,widgets,privileged}.py
-/usr/share/gamemode-gui/{options.json,locale/it.xml}
-/usr/share/applications/io.github.gamemodegui.GameModeGui.desktop
-/usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
-```
-
-Dopo l'installazione l'app compare nel menu (icona standard "GameMode GUI") e si
-avvia da lì o con il comando `gamemode-gui`. Per l'RPM serve `rpmbuild`
-(pacchetto `rpm-build`); in mancanza si può indicare un binario con
-`RPMBUILD=/path/rpmbuild packaging/build.sh`.
-
-## Quale file configura la GUI (e quali legge il daemon)
-
-GameMode carica **più file** e li fonde in ordine (`gamemode-config.c`), con
-`CONFIG_NAME = gamemode.ini` e 4 posizioni:
-
-| Ordine | Percorso | Tipo | Note |
-|---|---|---|---|
-| 1 | `/usr/share/gamemode/gamemode.ini` | protected | config "spedita" dal pacchetto (il suo `example/gamemode.ini`) |
-| 2 | `/etc/gamemode.ini` | protected | config dell'amministratore |
-| 3 | `~/.config/gamemode.ini` (o `$XDG_CONFIG_HOME`) | unsafe | config utente |
-| 4 | `$PWD/gamemode.ini` | unsafe | directory di lavoro del daemon |
-
-Le **liste** (`whitelist`/`blacklist`, `start`/`end`) si accodano; i **valori
-scalari sovrascrivono** quelli dei file precedenti → vince l'ultimo letto.
-
-**La GUI usa il file installato come base e scrive gli override in
-`/etc/gamemode.ini`.** Il percorso del file installato è rilevato a runtime
-(`$XDG_DATA_DIRS` poi `/usr/local/share` e `/usr/share` →
-`<datadir>/gamemode/gamemode.ini`; per i test si può forzare con `GAMEMODE_BASE`).
-I valori mostrati sono quelli **effettivi**, cioè il risultato del merge
-base + `/etc` (liste accodate, scalari sovrascritti), esattamente come li vede il
-daemon. I commenti delle voci scritte in `/etc` vengono presi dal file installato
-quando disponibili.
-
-## Note su `[gpu]` e "power state"
-
-Le voci `nv_powermizer_mode` (NVIDIA: 0=Adaptive, 1=Prefer Max, 2=Auto) e
-`amd_performance_level` (AMD: auto/low/high) sono le uniche opzioni che gestiscono
-i *power state* della GPU, e il daemon **le applica solo leggendo i percorsi
-"protected"** (`/usr/share/gamemode` e `/etc`; la sezione `[gpu]` è ignorata
-altrove, con log esplicito). Gestendo il file in `/etc`, la GUI le rende
-realmente effettive: all'ingresso in GameMode il daemon applica il power state
-scelto e al termine lo ripristina.
+Some options (especially the GPU/iGPU ones) may not be supported or may not work correctly on laptops, due to different thermal and power management. In general, changing the governor, platform profiles, GPU power state and system priorities can reduce the machine's stability (crashes, freezes, reboots, overheating). Apply one change at a time, check the result, and keep the "Restore backup" and "Restore original" buttons in the Summary tab within reach. GPU optimisations only take effect if the file is at /etc/gamemode.ini and require the responsibility acceptance switch.
