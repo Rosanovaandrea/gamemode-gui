@@ -36,18 +36,6 @@ GENERAL_OPTIONS: List[OptionSpec] = [
         comment="; The default governor is used when leaving GameMode instead of "
                 "restoring the original value"),
     OptionSpec(
-        key="desiredprof", type="choice", default="performance",
-        choices=["performance", "low-power", "balanced"],
-        description_id="opt.general.desiredprof",
-        comment="; The desired platform profile is used when entering GameMode "
-                "instead of \"performance\""),
-    OptionSpec(
-        key="defaultprof", type="choice", default="",
-        choices=["performance", "low-power", "balanced"],
-        description_id="opt.general.defaultprof",
-        comment="; The default platform profile is used when leaving GameMode "
-                "instead of restoring the original value"),
-    OptionSpec(
         key="igpu_desiredgov", type="choice", default="powersave",
         special=True, special_source="cpu_governors",
         description_id="opt.general.igpu_desiredgov",

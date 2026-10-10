@@ -30,8 +30,10 @@ assert general.render() == ""
 assert general.get_reaper_freq() == 5
 assert general.get_desiredgov() == "performance"
 assert available_governors()
-assert general.choices_for(GENERAL_OPTIONS[1]) == available_governors()
-assert general.choices_for(GENERAL_OPTIONS[3]) == ["performance", "low-power", "balanced"]
+governor_option = next(spec for spec in GENERAL_OPTIONS if spec.key == "desiredgov")
+assert general.choices_for(governor_option) == available_governors()
+softrealtime_option = next(spec for spec in GENERAL_OPTIONS if spec.key == "softrealtime")
+assert general.choices_for(softrealtime_option) == ["auto", "on", "off"]
 
 general.set_reaper_freq(10)
 general.set_inhibit_screensaver(False)

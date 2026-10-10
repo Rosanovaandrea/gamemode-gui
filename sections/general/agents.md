@@ -1,9 +1,9 @@
 # Section: general (`[general]`)
 
-Manages the `[general]` keys of `gamemode.ini`: reaper frequency, CPU governor and
-platform profile (desired/default), iGPU governor and load threshold, soft-realtime,
-renice, ioprio, screensaver inhibition and split-lock mitigation. The full list is
-`GENERAL_OPTIONS` in `core.py`.
+Manages the `[general]` keys of `gamemode.ini`: reaper frequency, CPU governor
+(desired/default), iGPU governor and load threshold, soft-realtime, renice, ioprio,
+screensaver inhibition and split-lock mitigation. The full list is `GENERAL_OPTIONS`
+in `core.py`.
 
 ## Files
 
