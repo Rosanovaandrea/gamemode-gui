@@ -71,11 +71,6 @@ def _atomic_replace(dst: str, producer) -> None:
         raise
 
 
-def _atomic_write(dst: str, data: bytes) -> None:
-    """Atomically create/replace ``dst`` with ``data``."""
-    _atomic_replace(dst, lambda fh: fh.write(data))
-
-
 def _atomic_copy(src: str, dst: str) -> None:
     """Atomically create/replace ``dst`` with a copy of the file ``src``.
 
@@ -106,7 +101,8 @@ def ensure_orig(target: str, seed_content: str | None = None,
     if os.path.isfile(target):
         _atomic_copy(target, orig)
     elif seed_content is not None:
-        _atomic_write(orig, seed_content.encode("utf-8"))
+        # Write the caller-provided seed as the pristine content (atomic).
+        _atomic_replace(orig, lambda handle: handle.write(seed_content.encode("utf-8")))
     elif fallback_path and os.path.isfile(fallback_path):
         _atomic_copy(fallback_path, orig)
 
@@ -123,7 +119,8 @@ def write_commit(target: str, content: str, orig_seed_content: str | None = None
         os.makedirs(directory, mode=0o700, exist_ok=True)
 
     tmp = target + ".tmp"
-    _atomic_write(tmp, content.encode("utf-8"))
+    # Write the new content to the temp file (atomic: temp file + os.replace).
+    _atomic_replace(tmp, lambda handle: handle.write(content.encode("utf-8")))
 
     # An empty seed is equivalent to "no seed": use the content just written.
     ensure_orig(target, seed_content=(orig_seed_content or None), fallback_path=tmp)

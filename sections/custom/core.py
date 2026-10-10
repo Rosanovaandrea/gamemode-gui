@@ -64,29 +64,35 @@ class CustomCore:
     options = CUSTOM_OPTIONS
 
     def __init__(self) -> None:
+        """Create the section state and install the speaking option accessors."""
         self.state = CustomState()
         self._listeners: List[Callable[[str], None]] = []
         self._install_accessors()
 
     def subscribe(self, listener: Callable[[str], None]) -> None:
+        """Register a view callback; it receives the option key that changed."""
         self._listeners.append(listener)
 
     def _notify(self, changed_key: str) -> None:
+        """Notify every subscribed view that one option changed."""
         for listener in self._listeners:
             listener(changed_key)
 
     def _install_accessors(self) -> None:
+        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
         for spec in self.options:
             setattr(self, f"get_{spec.key}", self._make_getter(spec.key))
             setattr(self, f"set_{spec.key}", self._make_setter(spec.key))
 
     def _make_getter(self, key: str):
+        """Return the ``get_<key>`` closure that reads one option from the state."""
         def get_option_value():
             return getattr(self.state, key)
         get_option_value.__name__ = f"get_{key}"
         return get_option_value
 
     def _make_setter(self, key: str):
+        """Return the ``set_<key>`` closure that writes one option and notifies."""
         def set_option_value(value) -> None:
             setattr(self.state, key, value)
             self._notify(key)
@@ -94,19 +100,23 @@ class CustomCore:
         return set_option_value
 
     def choices_for(self, spec: OptionSpec) -> List[str]:
+        """Allowed values of an option (the ``[custom]`` options are all static)."""
         return list(spec.choices or [])
 
     def _effective_list(self, spec: OptionSpec) -> List[str]:
         """The list value plus the fixed strings of its active toggle entries."""
         items: List[str] = []
         for toggle in self.options:
+            # An active toggle targeting this list contributes its fixed string first.
             if (toggle.type == "toggle_entry" and toggle.target == spec.key
                     and getattr(self.state, toggle.key)):
                 items.append(toggle.entry)
+        # Then come the free-form items the user typed in the list editor.
         items.extend(getattr(self.state, spec.key) or [])
         return items
 
     def is_active(self, spec: OptionSpec) -> bool:
+        """True if an option is active (a non-empty list, or a set switch)."""
         if spec.type == "list":
             return bool(self._effective_list(spec))
         if spec.type == "bool":
@@ -122,8 +132,10 @@ class CustomCore:
         """Render the ``[custom]`` section, only with active options."""
         lines: List[str] = []
         for spec in self.options:
+            # A toggle_entry has no line of its own: it acts on the target list.
             if spec.type == "toggle_entry":
-                continue  # acts on the target list, no line of its own
+                continue
+            # A list is written as repeated keys: one line per item.
             if spec.type == "list":
                 items = self._effective_list(spec)
                 if not items:
@@ -133,6 +145,7 @@ class CustomCore:
                 for item in items:
                     lines.append(spec.template.format(value=escape_value(item)))
                 continue
+            # A scalar (e.g. the script timeout) is written only if activated.
             value = getattr(self.state, spec.key)
             if value is None or value == spec.default:
                 continue
@@ -141,6 +154,7 @@ class CustomCore:
             lines.append(spec.template.format(value=value))
         if not lines:
             return ""
+        # Wrap the active lines in the section header; the file ends with "\n".
         return f"[{self.section_id}]\n" + "\n".join(lines) + "\n"
 
     def apply(self, section: Dict[str, List[str]], append: bool = False) -> None:

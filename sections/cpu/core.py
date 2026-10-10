@@ -79,29 +79,35 @@ class CpuCore:
     options = CPU_OPTIONS
 
     def __init__(self) -> None:
+        """Create the section state and install the speaking option accessors."""
         self.state = CpuState()
         self._listeners: List[Callable[[str], None]] = []
         self._install_accessors()
 
     def subscribe(self, listener: Callable[[str], None]) -> None:
+        """Register a view callback; it receives the option key that changed."""
         self._listeners.append(listener)
 
     def _notify(self, changed_key: str) -> None:
+        """Notify every subscribed view that one option changed."""
         for listener in self._listeners:
             listener(changed_key)
 
     def _install_accessors(self) -> None:
+        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
         for spec in self.options:
             setattr(self, f"get_{spec.key}", self._make_getter(spec.key))
             setattr(self, f"set_{spec.key}", self._make_setter(spec.key))
 
     def _make_getter(self, key: str):
+        """Return the ``get_<key>`` closure that reads one option from the state."""
         def get_option_value():
             return getattr(self.state, key)
         get_option_value.__name__ = f"get_{key}"
         return get_option_value
 
     def _make_setter(self, key: str):
+        """Return the ``set_<key>`` closure that writes one option and notifies."""
         def set_option_value(value) -> None:
             setattr(self.state, key, value)
             self._notify(key)
@@ -109,17 +115,20 @@ class CpuCore:
         return set_option_value
 
     def choices_for(self, spec: OptionSpec) -> List[str]:
+        """Allowed values of an option: the online cores if special, else static."""
         if spec.special and spec.special_source == "cpu_cores":
             return available_cores()
         return list(spec.choices or [])
 
     @staticmethod
     def _is_written(spec: OptionSpec, value) -> bool:
+        """True if the option is active (a non-empty core list, or a set switch)."""
         if spec.type == "bool":
             return bool(value) != bool(spec.default)
         return bool(value)
 
     def is_active(self, spec: OptionSpec) -> bool:
+        """True if an option is active; used to gate the dependent options."""
         return self._is_written(spec, getattr(self.state, spec.key))
 
     def reset(self) -> None:
@@ -132,10 +141,13 @@ class CpuCore:
         lines: List[str] = []
         for spec in self.options:
             value = getattr(self.state, spec.key)
+            # Skip options still at their default: only active ones are written.
             if not self._is_written(spec, value):
                 continue
+            # Emit the definition comment above the option, when there is one.
             if spec.comment:
                 lines.append(spec.comment)
+            # A core list is written as a comma-separated list; a switch as 1/0.
             if spec.type == "cores":
                 lines.append(spec.template.format(
                     value=",".join(str(core) for core in value)))
@@ -145,6 +157,7 @@ class CpuCore:
                 lines.append(spec.template.format(value=value))
         if not lines:
             return ""
+        # Wrap the active lines in the section header; the file ends with "\n".
         return f"[{self.section_id}]\n" + "\n".join(lines) + "\n"
 
     def apply(self, section: Dict[str, List[str]]) -> None:

@@ -57,10 +57,6 @@ def normalize_lang_code(raw_code: object) -> Optional[str]:
     return code or None
 
 
-def _language_file(code: str) -> str:
-    return os.path.join(_LOCALE_DIR, f"{code}.xml")
-
-
 def _compute_supported_languages() -> None:
     """Validate the configured languages once and record the config errors.
 
@@ -97,7 +93,7 @@ def _compute_supported_languages() -> None:
 
     valid: List[str] = []
     for code in candidates:
-        if os.path.isfile(_language_file(code)):
+        if os.path.isfile(os.path.join(_LOCALE_DIR, f"{code}.xml")):
             if code not in valid:
                 valid.append(code)
         else:
@@ -106,7 +102,7 @@ def _compute_supported_languages() -> None:
     # If no configured language is usable, fall back to the safe defaults.
     if not valid:
         for code in _DEFAULT_SUPPORTED_LANGS:
-            if os.path.isfile(_language_file(code)) and code not in valid:
+            if os.path.isfile(os.path.join(_LOCALE_DIR, f"{code}.xml")) and code not in valid:
                 valid.append(code)
         if not valid:
             errors.append(("empty", ""))
@@ -130,7 +126,7 @@ def reset_supported_langs() -> None:
 
 def lang_label(code: str) -> str:
     """Human name of a language (its XML ``name``), or the upper-case code."""
-    path = _language_file(code)
+    path = os.path.join(_LOCALE_DIR, f"{code}.xml")
     if _ET is not None and os.path.isfile(path):
         try:
             name = (_ET.parse(path).getroot().get("name") or "").strip()
@@ -263,7 +259,7 @@ class Translator:
         if _ET is None:
             return
         for code in (self.lang, fallback_lang(), _DEFAULT_LANG):
-            path = _language_file(code)
+            path = os.path.join(_LOCALE_DIR, f"{code}.xml")
             if os.path.isfile(path):
                 break
         else:

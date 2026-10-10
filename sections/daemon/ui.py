@@ -32,6 +32,7 @@ class DaemonPage(Gtk.Box):
         self.refresh_group()
 
     def _page_header(self) -> Gtk.Widget:
+        """Build the page header: section title + subtitle."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.append(Gtk.Label(label=tr("tab.daemon.title"), xalign=0.0,
                              css_classes=["title-2"]))
@@ -40,6 +41,7 @@ class DaemonPage(Gtk.Box):
         return box
 
     def _actions_card(self) -> Gtk.Widget:
+        """Card with the daemon actions: restart and run the diagnostics."""
         card = self._card()
         restart = Gtk.Button(label=tr("btn.restart_daemon"))
         restart.add_css_class("suggested-action")
@@ -53,6 +55,7 @@ class DaemonPage(Gtk.Box):
         return card
 
     def _group_card(self) -> Gtk.Widget:
+        """Card showing the gamemode-group status and the join button."""
         card = self._card()
         card.append(Gtk.Label(label=tr("daemon.group.title"), xalign=0.0,
                               css_classes=["heading"]))
@@ -66,6 +69,7 @@ class DaemonPage(Gtk.Box):
         return card
 
     def _console_header(self) -> Gtk.Widget:
+        """Header of the console: title + clear button."""
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         header.append(Gtk.Label(label=tr("daemon.console.title"), xalign=0.0,
                                 hexpand=True, css_classes=["heading"]))
@@ -76,6 +80,7 @@ class DaemonPage(Gtk.Box):
         return header
 
     def _console(self) -> Gtk.Widget:
+        """Read-only, monospaced console that shows the raw command output."""
         self._console_view = Gtk.TextView(editable=False, monospace=True,
                                           wrap_mode=Gtk.WrapMode.WORD_CHAR,
                                           cursor_visible=False)
@@ -87,6 +92,7 @@ class DaemonPage(Gtk.Box):
 
     @staticmethod
     def _card() -> Gtk.Box:
+        """Create an empty card (rounded box with small internal margins)."""
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         card.add_css_class("card")
         for margin in ("top", "bottom", "start", "end"):
@@ -95,6 +101,7 @@ class DaemonPage(Gtk.Box):
 
     # -- console -------------------------------------------------------------
     def clear_console(self) -> None:
+        """Empty the console text buffer."""
         self._console_buffer.set_text("")
 
     def append_console(self, text: str) -> None:

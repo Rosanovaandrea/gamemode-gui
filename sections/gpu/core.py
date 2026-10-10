@@ -63,29 +63,35 @@ class GpuCore:
     options = GPU_OPTIONS
 
     def __init__(self) -> None:
+        """Create the section state and install the speaking option accessors."""
         self.state = GpuState()
         self._listeners: List[Callable[[str], None]] = []
         self._install_accessors()
 
     def subscribe(self, listener: Callable[[str], None]) -> None:
+        """Register a view callback; it receives the option key that changed."""
         self._listeners.append(listener)
 
     def _notify(self, changed_key: str) -> None:
+        """Notify every subscribed view that one option changed."""
         for listener in self._listeners:
             listener(changed_key)
 
     def _install_accessors(self) -> None:
+        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
         for spec in self.options:
             setattr(self, f"get_{spec.key}", self._make_getter(spec.key))
             setattr(self, f"set_{spec.key}", self._make_setter(spec.key))
 
     def _make_getter(self, key: str):
+        """Return the ``get_<key>`` closure that reads one option from the state."""
         def get_option_value():
             return getattr(self.state, key)
         get_option_value.__name__ = f"get_{key}"
         return get_option_value
 
     def _make_setter(self, key: str):
+        """Return the ``set_<key>`` closure that writes one option and notifies."""
         def set_option_value(value) -> None:
             setattr(self.state, key, value)
             self._notify(key)
@@ -93,15 +99,18 @@ class GpuCore:
         return set_option_value
 
     def choices_for(self, spec: OptionSpec) -> List[str]:
+        """Allowed values of an option (the ``[gpu]`` options are all static)."""
         return list(spec.choices or [])
 
     @staticmethod
     def _is_written(spec: OptionSpec, value) -> bool:
+        """True if the option is active (not empty and different from its default)."""
         if value is None or str(value) == "":
             return False
         return str(value) != str(spec.default)
 
     def is_active(self, spec: OptionSpec) -> bool:
+        """True if an option is active; used to gate the dependent options."""
         return self._is_written(spec, getattr(self.state, spec.key))
 
     def _dependency_active(self, spec: OptionSpec) -> bool:
@@ -121,16 +130,20 @@ class GpuCore:
         """Render the ``[gpu]`` section, only with active, enabled options."""
         lines: List[str] = []
         for spec in self.options:
+            # Skip the dependent options while their master switch is off.
             if not self._dependency_active(spec):
                 continue
             value = getattr(self.state, spec.key)
+            # Skip options still at their default: only active ones are written.
             if not self._is_written(spec, value):
                 continue
+            # Emit the definition comment above the option, when there is one.
             if spec.comment:
                 lines.append(spec.comment)
             lines.append(spec.template.format(value=value))
         if not lines:
             return ""
+        # Wrap the active lines in the section header; the file ends with "\n".
         return f"[{self.section_id}]\n" + "\n".join(lines) + "\n"
 
     def apply(self, section: Dict[str, List[str]]) -> None:

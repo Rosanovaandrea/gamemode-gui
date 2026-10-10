@@ -18,13 +18,11 @@ from typing import List, Optional
 from i18n import tr
 
 
-def _gamemoded_path() -> Optional[str]:
-    return find_executable("gamemoded", "/usr/bin/gamemoded", "/usr/local/bin/gamemoded")
-
-
 def test_daemon() -> CommandResult:
     """Run the daemon diagnostic tests (``gamemoded -t``)."""
-    gamemoded = _gamemoded_path()
+    # Locate gamemoded; if it is not installed there is nothing to test.
+    gamemoded = find_executable("gamemoded", "/usr/bin/gamemoded",
+                                "/usr/local/bin/gamemoded")
     if not gamemoded:
         return CommandResult(False, -1, error=tr("msg.gamemode_not_installed"),
                              command="gamemoded -t")
@@ -37,7 +35,9 @@ def daemon_version() -> CommandResult:
     ``gamemoderun --version`` is not used: ``gamemoderun`` execs the passed
     command with LD_PRELOAD and does not handle ``--version``.
     """
-    gamemoded = _gamemoded_path()
+    # The version is printed by gamemoded, not by the gamemoderun wrapper.
+    gamemoded = find_executable("gamemoded", "/usr/bin/gamemoded",
+                                "/usr/local/bin/gamemoded")
     if not gamemoded:
         return CommandResult(False, -1, error=tr("msg.gamemode_not_installed"),
                              command="gamemoded --version")

@@ -243,24 +243,28 @@ class MainWindow(Adw.ApplicationWindow):
 
     def notify_language_restart(self) -> None:
         """Tell the user the new language applies on the next start."""
-        self._run_dialog(info_dialog(self, tr("dlg.lang.title"), tr("dlg.lang.body")))
+        info_dialog(self, tr("dlg.lang.title"), tr("dlg.lang.body")).present()
 
     # -- dirty tracking ------------------------------------------------------
     def _on_state_changed(self) -> None:
+        """Mark the window dirty and refresh the dependent-option gating."""
         self._dirty = True
         self._refresh_gating()
 
     def _refresh_gating(self) -> None:
+        """Ask every page that supports it to re-evaluate its option gating."""
         for page in self.pages.values():
             if hasattr(page, "refresh_gating"):
                 page.refresh_gating()
 
     def _refresh_all(self) -> None:
+        """Re-sync every page with the (possibly reloaded) section state."""
         for page in self.pages.values():
             if hasattr(page, "refresh"):
                 page.refresh()
 
     def _on_close_request(self, *_):
+        """Ask for confirmation when closing with unsaved changes."""
         if not self._dirty:
             return False
         dialog = confirm_dialog(self, tr("dlg.unsaved.title"), tr("dlg.unsaved.body"),
@@ -270,6 +274,7 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _closed_confirmed(self, dialog, response: str) -> None:
+        """Close the window only if the user chose to discard the changes."""
         dialog.close()
         if response == tr("dlg.unsaved.exit"):
             self._dirty = False
@@ -282,12 +287,12 @@ class MainWindow(Adw.ApplicationWindow):
             self.core.save()
         except Exception as exc:
             body = tr("dlg.save_error.body").format(error=exc)
-            self._run_dialog(error_dialog(self, tr("dlg.save_error.title"), body))
+            error_dialog(self, tr("dlg.save_error.title"), body).present()
             return
         self._refresh_all()
         self._dirty = False
-        self._run_dialog(info_dialog(self, tr("dlg.save_daemon.title"),
-                                     tr("dlg.save_daemon.body")))
+        info_dialog(self, tr("dlg.save_daemon.title"),
+                    tr("dlg.save_daemon.body")).present()
 
     def do_restore_previous(self) -> None:
         """Restore the previous state after confirmation."""
@@ -315,10 +320,10 @@ class MainWindow(Adw.ApplicationWindow):
             initializer.reload(self.state)
             self._refresh_all()
             self._dirty = False
-            self._show_toast(tr(f"{prefix}.ok"))
+            self.toast_overlay.add_toast(Adw.Toast(title=tr(f"{prefix}.ok")))
         else:
-            self._run_dialog(info_dialog(self, tr(f"{prefix}.title"),
-                                         tr(f"{prefix}.none")))
+            info_dialog(self, tr(f"{prefix}.title"),
+                        tr(f"{prefix}.none")).present()
 
     # -- daemon actions ------------------------------------------------------
     def do_restart_daemon(self) -> None:
@@ -345,17 +350,12 @@ class MainWindow(Adw.ApplicationWindow):
         page.show_output(result.output)
 
     def _show_help(self) -> None:
-        self._run_dialog(info_dialog(self, tr("dlg.help.title"), tr("dlg.help.body")))
-
-    def _run_dialog(self, dialog: Adw.MessageDialog) -> None:
-        dialog.present()
-
-    def _show_toast(self, message: str) -> None:
-        self.toast_overlay.add_toast(Adw.Toast(title=message))
+        info_dialog(self, tr("dlg.help.title"), tr("dlg.help.body")).present()
 
     def _warn_language_errors(self) -> None:
+        """Show a toast for every language-configuration error (non-blocking)."""
         for message in i18n.describe_lang_errors():
-            self._show_toast(message)
+            self.toast_overlay.add_toast(Adw.Toast(title=message))
 
 
 # --- application ------------------------------------------------------------

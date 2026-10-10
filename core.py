@@ -56,12 +56,12 @@ class ConfigManager:
     def save(self, content: str) -> None:
         """Commit ``content`` to the managed file (privileged or local)."""
         if is_privileged_path(self.config_path):
+            # Privileged target (e.g. /etc): the write is done by the root helper.
             seed_file = self._write_seed_tmp()
             extra_args = [seed_file] if seed_file else []
             try:
                 result = run_privileged("commit", self.config_path,
-                                                 content=content,
-                                                 extra_args=extra_args)
+                                        content=content, extra_args=extra_args)
             finally:
                 if seed_file:
                     try:
@@ -92,8 +92,7 @@ class ConfigManager:
         """Restore the previous state (``.bak`` -> active file)."""
         try:
             if is_privileged_path(self.config_path):
-                return run_privileged("restore-backup",
-                                               self.config_path).success
+                return run_privileged("restore-backup", self.config_path).success
             fileops.restore_from_backup(self.config_path)
             return True
         except OSError:
@@ -103,8 +102,7 @@ class ConfigManager:
         """Restore the pristine state (``.orig`` -> active file)."""
         try:
             if is_privileged_path(self.config_path):
-                return run_privileged("restore-orig",
-                                               self.config_path).success
+                return run_privileged("restore-orig", self.config_path).success
             fileops.restore_from_orig(self.config_path)
             return True
         except OSError:
@@ -117,8 +115,7 @@ class ConfigManager:
         seed_content = self.read_existing() or self.orig_seed or default_content
         if is_privileged_path(self.config_path):
             try:
-                run_privileged("ensure-orig", self.config_path,
-                                        content=seed_content)
+                run_privileged("ensure-orig", self.config_path, content=seed_content)
             except Exception:
                 pass
         else:
@@ -157,10 +154,6 @@ def resolve_base_path() -> Optional[str]:
 
 # --- JSON session persistence ------------------------------------------------
 
-def session_path(config_path: str) -> str:
-    return config_path + ".session.json"
-
-
 def save_session(config_path: str, values: Dict[str, object]) -> None:
     """Persist the current values to ``<config>.session.json`` (best effort)."""
     categories: Dict[str, Dict[str, object]] = {}
@@ -169,7 +162,8 @@ def save_session(config_path: str, values: Dict[str, object]) -> None:
         categories.setdefault(section, {})[key] = value
     data = {"version": 1, "categories": categories}
     try:
-        with open(session_path(config_path), "w", encoding="utf-8") as handle:
+        # The session sidecar lives next to the config: <config>.session.json.
+        with open(config_path + ".session.json", "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2)
     except OSError:
         pass
@@ -178,7 +172,8 @@ def save_session(config_path: str, values: Dict[str, object]) -> None:
 def load_session(config_path: str) -> Optional[Dict[str, object]]:
     """Load the flat ``section.key -> value`` mapping from the session JSON."""
     try:
-        with open(session_path(config_path), "r", encoding="utf-8") as handle:
+        # The session sidecar lives next to the config: <config>.session.json.
+        with open(config_path + ".session.json", "r", encoding="utf-8") as handle:
             data = json.load(handle)
     except (OSError, ValueError):
         return None
@@ -288,24 +283,21 @@ def _privileged_prefixes() -> List[List[str]]:
     return prefixes
 
 
-def _privileged_helper_argv(command: str, path: str,
-                            extra_args: Optional[List[str]] = None) -> List[str]:
-    """Command line that runs the root helper (``privileged.py``)."""
-    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
-    return [sys.executable, helper, command, path] + list(extra_args or [])
-
-
 def run_privileged(command: str, path: str, content: str = "", timeout: int = 60,
                    extra_args: Optional[List[str]] = None) -> CommandResult:
     """Run a privileged operation, trying pkexec then sudo."""
-    argv = _privileged_helper_argv(command, path, extra_args)
+    # Command line: python <package>/privileged.py <command> <path> [extra args].
+    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
+    helper_argv = [sys.executable, helper, command, path] + list(extra_args or [])
     for prefix in _privileged_prefixes():
         try:
-            process = subprocess.run(prefix + argv, input=content, capture_output=True,
-                                     text=True, timeout=timeout, check=False)
+            # Run the helper as root and capture its output.
+            process = subprocess.run(prefix + helper_argv, input=content,
+                                     capture_output=True, text=True,
+                                     timeout=timeout, check=False)
             return CommandResult(process.returncode == 0, process.returncode,
                                  process.stdout, process.stderr,
-                                 command=" ".join(prefix + argv))
+                                 command=" ".join(prefix + helper_argv))
         except FileNotFoundError:
             continue
         except subprocess.SubprocessError:

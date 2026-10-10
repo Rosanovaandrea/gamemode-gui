@@ -118,25 +118,30 @@ class GeneralCore:
     options = GENERAL_OPTIONS
 
     def __init__(self) -> None:
+        """Create the section state and install the speaking option accessors."""
         self.state = GeneralState()
         self._listeners: List[Callable[[str], None]] = []
         self._install_accessors()
 
     # -- change notification (React-like) ------------------------------------
     def subscribe(self, listener: Callable[[str], None]) -> None:
+        """Register a view callback; it receives the option key that changed."""
         self._listeners.append(listener)
 
     def _notify(self, changed_key: str) -> None:
+        """Notify every subscribed view that one option changed."""
         for listener in self._listeners:
             listener(changed_key)
 
     # -- speaking accessors, one per option ----------------------------------
     def _install_accessors(self) -> None:
+        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
         for spec in self.options:
             setattr(self, f"get_{spec.key}", self._make_getter(spec.key))
             setattr(self, f"set_{spec.key}", self._make_setter(spec.key))
 
     def _make_getter(self, key: str):
+        """Return the ``get_<key>`` closure that reads one option from the state."""
         def get_option_value():
             return getattr(self.state, key)
         get_option_value.__name__ = f"get_{key}"
@@ -144,6 +149,7 @@ class GeneralCore:
         return get_option_value
 
     def _make_setter(self, key: str):
+        """Return the ``set_<key>`` closure that writes one option and notifies."""
         def set_option_value(value) -> None:
             setattr(self.state, key, value)
             self._notify(key)
@@ -169,18 +175,21 @@ class GeneralCore:
         lines: List[str] = []
         for spec in self.options:
             value = getattr(self.state, spec.key)
+            # Skip options still at their default: only active ones are written.
             if not self._is_written(spec, value):
                 continue
+            # Emit the definition comment above the option, when there is one.
             if spec.comment:
                 lines.append(spec.comment)
             lines.append(self._render_line(spec, value))
         if not lines:
             return ""
+        # Wrap the active lines in the section header; the file ends with "\n".
         return f"[{self.section_id}]\n" + "\n".join(lines) + "\n"
 
     @staticmethod
     def _is_written(spec: OptionSpec, value) -> bool:
-        """True if the option is active (differs from its default)."""
+        """True if the option is active, i.e. its value differs from the default."""
         if spec.type == "bool":
             return bool(value) != bool(spec.default)
         if value is None or str(value) == "":
@@ -189,6 +198,7 @@ class GeneralCore:
 
     @staticmethod
     def _render_line(spec: OptionSpec, value) -> str:
+        """Format one option as an INI line (booleans as 1/0, others as-is)."""
         if spec.type == "bool":
             return spec.template.format(value=1 if value else 0)
         return spec.template.format(value=value)
@@ -210,6 +220,7 @@ class GeneralCore:
 
     @staticmethod
     def _parse_value(spec: OptionSpec, raw_values: List[str]) -> Optional[object]:
+        """Convert the raw INI values of one option to its Python type (or None)."""
         raw = raw_values[-1] if len(raw_values) == 1 else ",".join(raw_values)
         try:
             if spec.type == "int":

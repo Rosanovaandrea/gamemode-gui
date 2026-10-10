@@ -90,6 +90,7 @@ class ChoicePicker(Gtk.Box):
             self._add_button(choice)
 
     def _add_button(self, value: str, label: Optional[str] = None) -> None:
+        """Create one radio button, grouped with the others, for ``value``."""
         btn = Gtk.ToggleButton(label=label or self._labels.get(value) or value)
         btn.add_css_class("choice-button")
         btn.set_group(self._buttons[0] if self._buttons else None)
@@ -99,10 +100,11 @@ class ChoicePicker(Gtk.Box):
         self._flow.append(btn)
 
     def _on_toggled(self, btn: Gtk.ToggleButton, value: str) -> None:
+        """Record the selected value and uncheck the other buttons."""
         if self._suppress:
-            return
+            return                      # programmatic change: ignore the signal
         if not btn.get_active():
-            return
+            return                      # only react to the button being turned on
         self._selected = value
         for other in self._buttons:
             if other is not btn:
@@ -113,11 +115,13 @@ class ChoicePicker(Gtk.Box):
 
     # -- Value API -----------------------------------------------------------
     def get_value(self) -> str:
+        """Selected value, or an empty string when nothing is selected."""
         return self._selected or ""
 
     def set_value(self, value) -> None:
+        """Select ``value``; add a button for it if it is not among the choices."""
         value = str(value or "")
-        # The current value may not be among the choices (e.g. a governor that is
+        # The stored value may not be an allowed choice (e.g. a governor that is
         # no longer available): add it so it can still be shown.
         if value and value not in self._values:
             self._add_button(value)
@@ -128,6 +132,7 @@ class ChoicePicker(Gtk.Box):
         self._suppress = False
 
     def set_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable every choice button."""
         for btn in self._buttons:
             btn.set_sensitive(bool(sensitive))
 
@@ -173,31 +178,37 @@ class StepperBox(Gtk.Box):
         self.plus.connect("clicked", lambda *_: self._change(+self._step))
 
     def _fmt(self, value: float) -> str:
+        """Format the value for display (fixed decimals, or a rounded integer)."""
         if self._digits:
             return f"{value:.{self._digits}f}"
         return str(int(round(value)))
 
     def _change(self, delta: float) -> None:
-        new = self._value + delta
-        new = max(self._min, min(self._max, new))
-        new = round(new / self._step) * self._step
-        new = max(self._min, min(self._max, new))
-        if new != self._value:
-            self._value = new
-            self.value_label.set_text(self._fmt(new))
+        """Apply a step, clamp to [min, max] and notify if the value changed."""
+        candidate = self._value + delta
+        # Clamp to the range, align to the step, then clamp again after rounding.
+        candidate = max(self._min, min(self._max, candidate))
+        candidate = round(candidate / self._step) * self._step
+        candidate = max(self._min, min(self._max, candidate))
+        if candidate != self._value:
+            self._value = candidate
+            self.value_label.set_text(self._fmt(candidate))
             self._on_change()
 
     # -- Value API -----------------------------------------------------------
     def get_value(self):
+        """Current value as an int (or a rounded float when decimals are used)."""
         if self._digits:
             return round(self._value, self._digits)
         return int(round(self._value))
 
     def set_value(self, value) -> None:
+        """Set the value, clamped to the range, and refresh the label."""
         self._value = max(self._min, min(self._max, float(value)))
         self.value_label.set_text(self._fmt(self._value))
 
     def set_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable both step buttons."""
         self.minus.set_sensitive(bool(sensitive))
         self.plus.set_sensitive(bool(sensitive))
 
@@ -234,16 +245,19 @@ class SwitchBox(Gtk.Box):
         self.append(self.switch)
 
     def _on_toggled(self, *_):
+        """Forward a real user toggle to the change callback (ignore programmatic)."""
         if not self._suppress:
             self._on_change()
 
     # -- Value API -----------------------------------------------------------
     def get_value(self):
+        """Value mapped from the switch state (``on_value``/``off_value`` or bool)."""
         if self._on_value is not None:
             return self._on_value if self.switch.get_active() else self._off_value
         return self.switch.get_active()
 
     def set_value(self, value) -> None:
+        """Set the switch from a value, without emitting the change callback."""
         self._suppress = True
         if self._on_value is not None:
             self.switch.set_active(str(value) == str(self._on_value))
@@ -288,6 +302,7 @@ class ListEditor(Gtk.Box):
         self.entry.connect("activate", self._on_add)
 
     def _on_add(self, *_):
+        """Append the text in the entry as a new item, then clear the entry."""
         text = self.entry.get_text().strip()
         if text:
             self._items.append(text)
@@ -296,12 +311,14 @@ class ListEditor(Gtk.Box):
             self._on_change()
 
     def _remove_item(self, index: int) -> None:
+        """Remove the item at ``index`` (if valid) and re-render the list."""
         if 0 <= index < len(self._items):
             self._items.pop(index)
             self._render()
             self._on_change()
 
     def _render(self) -> None:
+        """Rebuild the list rows: one label + delete button per item."""
         while (child := self.listbox.get_first_child()) is not None:
             self.listbox.remove(child)
         for i, item in enumerate(self._items):
@@ -311,6 +328,7 @@ class ListEditor(Gtk.Box):
             rm = Gtk.Button(icon_name="edit-delete-symbolic")
             rm.add_css_class("flat")
             rm.set_tooltip_text(tr("list.remove.tooltip"))
+            # Bind the current index so the right item is removed on click.
             rm.connect("clicked", lambda _b, idx=i: self._remove_item(idx))
             hbox.append(lbl)
             hbox.append(rm)
@@ -319,13 +337,16 @@ class ListEditor(Gtk.Box):
 
     # -- Value API -----------------------------------------------------------
     def get_value(self) -> List[str]:
+        """Current items as a fresh list (a copy, so callers cannot mutate it)."""
         return list(self._items)
 
     def set_value(self, items: List[str]) -> None:
+        """Replace the items and re-render the list."""
         self._items = [str(i) for i in items]
         self._render()
 
     def set_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable the entry field."""
         self.entry.set_sensitive(bool(sensitive))
 
 
@@ -366,15 +387,18 @@ class CoresEditor(Gtk.Box):
         self.append(flow)
 
     def _on_toggled(self, *_):
+        """Forward a real user toggle to the change callback (ignore programmatic)."""
         if not self._suppress:
             self._on_change()
 
     # -- Value API -----------------------------------------------------------
     def get_value(self) -> List[int]:
+        """Selected core ids, sorted ascending."""
         return sorted(int(core) for core, chk in self._checks.items()
                       if chk.get_active())
 
     def set_value(self, values) -> None:
+        """Check the given cores; accept a list, a cpu-list string or an int."""
         if values is None:
             values = []
         if isinstance(values, (str, int)):
@@ -386,6 +410,7 @@ class CoresEditor(Gtk.Box):
         self._suppress = False
 
     def set_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable every core checkbox."""
         for chk in self._checks.values():
             chk.set_sensitive(bool(sensitive))
 
@@ -489,11 +514,13 @@ class OptionRow(Gtk.Box):
 
     # -- signals -------------------------------------------------------------
     def _on_value_changed(self, *_):
+        """Forward an input change to the row callback (unless programmatic)."""
         if not self._suppress:
             self._on_change(self.spec.key)
 
     # -- public API ----------------------------------------------------------
     def set_value(self, value) -> None:
+        """Set the input value; a bad value is ignored, a good one is propagated."""
         try:
             self._input.set_value(value)
         except (TypeError, ValueError):
@@ -502,6 +529,7 @@ class OptionRow(Gtk.Box):
             self._on_change(self.spec.key)
 
     def get_value(self):
+        """Current value held by the input widget."""
         return self._input.get_value()
 
     def set_enabled(self, enabled: bool) -> None:

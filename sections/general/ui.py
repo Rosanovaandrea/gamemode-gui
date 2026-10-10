@@ -30,6 +30,7 @@ class GeneralPage(Gtk.Box):
         self.refresh_gating()
 
     def _header(self) -> Gtk.Widget:
+        """Build the page header: section title + subtitle."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.append(Gtk.Label(label=tr(TITLE_ID), xalign=0.0, css_classes=["title-2"]))
         box.append(Gtk.Label(label=tr(SUBTITLE_ID), xalign=0.0,
@@ -37,6 +38,7 @@ class GeneralPage(Gtk.Box):
         return box
 
     def _option_list(self) -> Gtk.Widget:
+        """Build the scrollable list with one row per option of the section."""
         scroller = Gtk.ScrolledWindow(vexpand=True)
         listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         listbox.add_css_class("boxed-list")
@@ -47,16 +49,21 @@ class GeneralPage(Gtk.Box):
 
     # -- rows ----------------------------------------------------------------
     def _make_row(self, spec) -> OptionRow:
+        """Build one editable row, wired to the core's setter, and track it."""
+        # The section supplies the allowed values (kernel-derived ones included).
         row = OptionRow(spec, choices=self.core.choices_for(spec))
         self._populate_row(row)
+        # A change in the widget pushes the new value into the core.
         row._on_change = lambda _key, _row=row: self._on_row_change(_row)
         self.rows.append(row)
         return row
 
     def _on_row_change(self, row: OptionRow) -> None:
+        """Push the widget value into the state through the speaking setter."""
         getattr(self.core, f"set_{row.spec.key}")(row.get_value())
 
     def _populate_row(self, row: OptionRow) -> None:
+        """Sync a row with the state without propagating the change event."""
         row._suppress = True
         row.set_value(getattr(self.core, f"get_{row.spec.key}")())
         row._suppress = False
