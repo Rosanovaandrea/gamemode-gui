@@ -2,10 +2,8 @@
 
 This module collects the *building blocks* of the interface. The construction of
 the control for an option is centralised in :func:`build_widget`: the widget is
-chosen from the fields of the JSON definition (``value_type`` / ``widget``), so no
-per-option code is needed. The only difference for "special" values is in
-``core.resolve_choices`` (the values come from the system), but the widget stays
-standard.
+chosen from the option type, and the section that owns the option supplies the
+allowed values (including the kernel-derived ones), so the widget stays generic.
 
 It contains:
 
@@ -31,8 +29,28 @@ gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk
 
-import core
-from core import tr
+from i18n import tr
+
+
+def _expand_cpu_list(text: str):
+    """Expand a Linux cpu-list (e.g. ``"0-3,8"``) into a sorted list of ints."""
+    cores = []
+    for token in str(text).split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            start, _, end = token.partition("-")
+            try:
+                cores.extend(range(int(start), int(end) + 1))
+            except ValueError:
+                continue
+        else:
+            try:
+                cores.append(int(token))
+            except ValueError:
+                pass
+    return sorted(set(cores))
 
 
 # ===========================================================================
@@ -360,7 +378,7 @@ class CoresEditor(Gtk.Box):
         if values is None:
             values = []
         if isinstance(values, (str, int)):
-            values = core.expand_cpu_list(str(values))
+            values = _expand_cpu_list(str(values))
         selected = {str(v) for v in values}
         self._suppress = True
         for core, chk in self._checks.items():
@@ -375,14 +393,15 @@ class CoresEditor(Gtk.Box):
 # ===========================================================================
 # Standard control builder (no per-option ad-hoc code)
 # ===========================================================================
-def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
+def build_widget(spec, on_change: Callable[[], None],
+                 choices: Optional[List[str]] = None) -> Gtk.Widget:
     """Build the right control for an option.
 
-    The value type and the widget are described in the JSON: here there is a
-    single point that translates them into GTK. For special options only the
-    "choices" change (resolved by ``core.resolve_choices``); the widget stays
-    standard.
+    The widget is chosen from the option type; ``choices`` are supplied by the
+    section (which owns the allowed values, including the kernel-derived ones),
+    falling back to the static ``spec.choices``.
     """
+    available = list(choices) if choices is not None else list(spec.choices or [])
     t = spec.type
     if t in ("int", "float"):
         is_float = t == "float"
@@ -405,7 +424,7 @@ def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
         return SwitchBox(active=bool(spec.default), on_change=on_change)
     if t == "choice":
         return ChoicePicker(
-            choices=core.resolve_choices(spec),
+            choices=available,
             on_change=on_change,
             allow_unset=(spec.default == ""),
             labels=spec.choice_labels,
@@ -413,7 +432,7 @@ def build_widget(spec, on_change: Callable[[], None]) -> Gtk.Widget:
     if t == "list":
         return ListEditor(on_change=on_change)
     if t == "cores":
-        return CoresEditor(cores=core.resolve_choices(spec), on_change=on_change)
+        return CoresEditor(cores=available, on_change=on_change)
     # string / fallback
     entry = Gtk.Entry(text=str(spec.default))
     entry.connect("changed", lambda *_: on_change())
@@ -440,6 +459,7 @@ class OptionRow(Gtk.Box):
         self,
         spec,
         on_change: Optional[Callable[[str], None]] = None,
+        choices: Optional[List[str]] = None,
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.set_margin_top(8)
@@ -462,14 +482,15 @@ class OptionRow(Gtk.Box):
         header.append(desc)
         self.append(header)
 
-        # Standard input widget, built from the definition type.
-        self._input = build_widget(spec, self._on_value_changed)
+        # Standard input widget, built from the definition type; the section
+        # supplies the allowed values (kernel-derived ones included).
+        self._input = build_widget(spec, self._on_value_changed, choices=choices)
         self.append(self._input)
 
     # -- signals -------------------------------------------------------------
     def _on_value_changed(self, *_):
         if not self._suppress:
-            self._on_change(self.spec.id)
+            self._on_change(self.spec.key)
 
     # -- public API ----------------------------------------------------------
     def set_value(self, value) -> None:
@@ -478,7 +499,7 @@ class OptionRow(Gtk.Box):
         except (TypeError, ValueError):
             return
         if not self._suppress:
-            self._on_change(self.spec.id)
+            self._on_change(self.spec.key)
 
     def get_value(self):
         return self._input.get_value()

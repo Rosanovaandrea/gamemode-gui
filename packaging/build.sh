@@ -26,10 +26,11 @@ mkdir -p "$WORK" "$DIST_DIR"
 # Source tarball (used by the RPM)
 # ---------------------------------------------------------------------------
 SRCDIR="$WORK/$NAME-$VERSION"
-mkdir -p "$SRCDIR/locale" "$SRCDIR/packaging"
-install -m 644 "$ROOT"/{core.py,ui.py,widgets.py,privileged.py,fileops.py,options.json,presentation.json,style.css,LICENSE} "$SRCDIR/"
+mkdir -p "$SRCDIR/packaging"
+install -m 644 "$ROOT"/{core.py,ui.py,initializer.py,spec.py,i18n.py,fileops.py,privileged.py,widgets.py,LICENSE} "$SRCDIR/"
 install -m 755 "$ROOT/main.py" "$SRCDIR/main.py"
-install -m 644 "$ROOT/locale/it.xml" "$ROOT/locale/en.xml" "$SRCDIR/locale/"
+cp -r "$ROOT/sections" "$ROOT/data" "$SRCDIR/"
+find "$SRCDIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
 install -m 644 "$HERE"/io.github.gamemodegui.GameModeGui.desktop \
     "$HERE"/io.github.gamemodegui.GameModeGui.svg \
     "$HERE"/gamemode-gui "$HERE"/gamemode-gui.spec "$SRCDIR/packaging/"
@@ -45,18 +46,17 @@ build_deb() {
     local tree="$WORK/deb"
     rm -rf "$tree"
     install -d "$tree/DEBIAN" \
-        "$tree/usr/share/$NAME/locale" \
+        "$tree/usr/share/$NAME" \
         "$tree/usr/bin" \
         "$tree/usr/share/applications" \
         "$tree/usr/share/icons/hicolor/scalable/apps" \
         "$tree/usr/share/doc/$NAME"
 
-    install -m 644 "$ROOT"/core.py "$ROOT"/ui.py "$ROOT"/widgets.py \
-        "$ROOT"/privileged.py "$ROOT"/fileops.py "$ROOT"/options.json \
-        "$ROOT"/presentation.json "$ROOT"/style.css "$tree/usr/share/$NAME/"
+    install -m 644 "$ROOT"/{core.py,ui.py,initializer.py,spec.py,i18n.py,fileops.py,privileged.py,widgets.py} \
+        "$tree/usr/share/$NAME/"
     install -m 755 "$ROOT/main.py" "$tree/usr/share/$NAME/main.py"
-    install -m 644 "$ROOT/locale/it.xml" "$ROOT/locale/en.xml" \
-        "$tree/usr/share/$NAME/locale/"
+    cp -r "$ROOT/sections" "$ROOT/data" "$tree/usr/share/$NAME/"
+    find "$tree/usr/share/$NAME" -name '__pycache__' -type d -prune -exec rm -rf {} +
     install -m 755 "$HERE/gamemode-gui" "$tree/usr/bin/gamemode-gui"
     install -m 644 "$HERE/io.github.gamemodegui.GameModeGui.desktop" \
         "$tree/usr/share/applications/io.github.gamemodegui.GameModeGui.desktop"

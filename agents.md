@@ -11,11 +11,10 @@ user-facing document (introduction, install, run, packaging).
 
 - **Project**: a desktop GUI (GTK4 + Libadwaita, Python 3) to manage the
   `gamemode.ini` configuration file of the **Feral GameMode** daemon.
-- **Repository layout**:
-  - `gamemode/` — the upstream **C source of GameMode**, used only as a reference
-    (not a fork; nothing of it is compiled). It documents the config locations, the
-    `[gpu]` "protected" rules and the CLI of the daemon.
-  - `gamemode-gui/` — the application itself (this repo).
+- **Repository layout**: the application lives in `gamemode-gui/` (the git
+  repository). The upstream GameMode C source was used only as a reference
+  (config locations, the `[gpu]` "protected" rules, the daemon CLI) and is no
+  longer part of the working tree.
 - **Goal**: manage **all** `gamemode.ini` options from a GUI, with a **safe write
   strategy** (atomic commit, backup, rollback, restore), a **declarative/tabular**
   INI generation (no `configparser`, so comments are preserved), a **tabbed** user
@@ -28,28 +27,44 @@ user-facing document (introduction, install, run, packaging).
 
 ## 2. Current architecture
 
-### 2.1 Modules (few files, by design)
+### 2.1 Layout (MVC-like, one folder per section)
 
 ```
 gamemode-gui/
-├── main.py           entry point (delegates to ui.main)
-├── options.json      option definitions per category (single source of truth)
-├── presentation.json content of the Presentation tab (data-driven)
-├── core.py           logic (definitions, special values, renderer, config, i18n, daemon, session)
-├── ui.py             the whole GTK interface, tabs generated from the data
-├── widgets.py        reusable widgets (build_widget + components)
-├── privileged.py     root helper for /etc (invoked via pkexec/sudo)
-├── fileops.py        atomic write / backup / rollback (shared GUI + root)
-├── style.css         app style (CSS loaded at runtime)
-├── locale/it.xml     Italian translations
-├── locale/en.xml     English translations
-├── test_core.py      logic tests (no display)
-└── smoke_test.py     interface tests (need DISPLAY, temporary folder)
+├── main.py                  entry point (runs ui.run)
+├── core.py                  general core: orchestration + save / restore / factory reset / language
+├── ui.py                    general window: header + gathers every section page
+├── initializer.py           general initializer: builds and wires the sections
+├── spec.py                  OptionSpec: the option descriptor (shared with the widget kit)
+├── i18n.py                  translations + language preference
+├── fileops.py               atomic write / backup / rollback (shared)
+├── privileged.py            root helper for /etc (invoked via pkexec/sudo)
+├── widgets.py               reusable widgets (build_widget + components)
+├── data/                    style.css, locale/
+├── sections/                one folder per section
+│   ├── general/  gpu/  cpu/  custom/   (core.py + ui.py + initializer.py)
+│   ├── presentation/                   (core.py + ui.py + presentation.json)
+│   └── daemon/                         (core.py + ui.py, stateless)
+└── test/                    tests
+    ├── test_engine.py       engine tests (no display)
+    ├── test_app.py          application tests (bootstrap / save / restore, no display)
+    └── smoke_test.py        interface tests (need DISPLAY, temporary folder)
 ```
 
-`ui.py` is organised in numbered "chapters" (1..8, plus a 5b for the Presentation
-tab), with the tabs as the main units, so the file is easy to navigate. `core.py`
-is pure logic (no GTK), fully testable without a display.
+Every **stateful section is self-contained**: its `core.py` defines the section's
+options, its own **state** and the logic to render itself to, and read itself from,
+gamemode.ini; its `ui.py` builds its own page; its `initializer.py` reads the
+section out of gamemode.ini into the state. The core exposes a **speaking
+getter/setter per option** (`set_reaper_freq`, `get_apply_gpu_optimisations`, ...).
+Stateless sections (`presentation`, `daemon`) have just `core.py` + `ui.py`.
+
+The only shared pieces are the option descriptor (`spec.py`), the widget kit
+(`widgets.py`), translations (`i18n.py`), the atomic file ops (`fileops.py`) and the
+root helper (`privileged.py`) used by the general save. Every section owns its own
+commands and data paths (duplication is accepted, for autonomy). The **general
+core** only orchestrates: it joins the sections' own output and performs save /
+restore / factory reset / language; the **general UI** gathers the pages; the
+**general initializer** wires the sections. All code and comments are in English.
 
 ### 2.2 Data-driven options — `options.json`
 
@@ -254,16 +269,16 @@ All commands use argument lists (`subprocess`), never `shell=True`.
 
 ## 4. Testing
 
-- **`test_core.py`** (no display): renderer/round-trip, repeated lists,
-  `[gpu]` dependency, CPU pinning/parking, custom scripts, the notification
-  `toggle_entry` behaviour, installed-base + `/etc` merge with comments, atomic
-  local commit + `.orig`/`.bak`/rollback, i18n (language normalisation/detection/
-  precedence + config-driven language list and error handling), session JSON,
-  `privileged.py` run locally.
-- **`smoke_test.py`** (needs DISPLAY): builds the real window, checks the tabs and
-  the default tab, edits a value, saves to a temporary path (`GAMEMODE_CONFIG`),
-  checks `.orig`/`.session.json` and the written content, exercises the notification
-  toggles and the GPU switch.
+- **`test/test_engine.py`** (no display): each section's options and INI
+  (de)serialisation (round-trip, repeated lists, `[gpu]` dependency, CPU
+  pinning/parking, notification `toggle_entry`), i18n (normalisation / detection /
+  precedence) and `privileged.py` run locally.
+- **`test/test_app.py`** (no display): bootstrap of every section, atomic save,
+  `.orig`/`.bak`, restore previous, factory reset and reload (which resets the
+  sections).
+- **`test/smoke_test.py`** (needs DISPLAY): builds the real window, checks the tabs,
+  the global action bar, the kernel-derived choices, editing + saving to a
+  temporary path (`GAMEMODE_CONFIG`) and the daemon console.
 - The app runs with `python3 main.py`; for tests on a writable path:
   `GAMEMODE_CONFIG=/tmp/try/gamemode.ini python3 main.py`.
 
