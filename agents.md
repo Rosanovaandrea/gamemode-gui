@@ -94,6 +94,10 @@ lives with its section.
 
 ## Testing
 
+- `test/sections/` — one integration test per section
+  (`python3 test/sections/run_all.py`): the happy path plus the failure paths
+  (invalid values, dependency gating, list merge, missing/broken files, command
+  errors). No display.
 - `test/test_engine.py` — each section's options and INI (de)serialisation, i18n and
   the root helper (no display).
 - `test/test_app.py` — bootstrap, atomic save, `.orig`/`.bak`, restore and reload
