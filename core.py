@@ -206,7 +206,7 @@ class AppCore:
 
     def render(self) -> str:
         """Join the sections' own output into the gamemode.ini content."""
-        parts = [section.render() for section in self.sections]
+        parts = [section.render_ini_section() for section in self.sections]
         parts = [part for part in parts if part]
         if not parts:
             return ""

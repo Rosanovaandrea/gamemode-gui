@@ -1,14 +1,16 @@
 # Section: cpu (`[cpu]`)
 
 Manages the `[cpu]` keys: core pinning and core parking. The options live in
-`CPU_OPTIONS` in `core.py`.
+`CPU_OPTIONS` in `options.py`.
 
 ## Files
 
-- `core.py` — `CPU_OPTIONS`, `CpuState` and `CpuCore`, plus `available_cores()` and
+- `options.py` — `CPU_OPTIONS`, the option descriptors (the `[cpu]` keys).
+- `core.py` — `CpuCore` (extends `SectionCore`), plus `available_cores()` and
   `expand_cpu_list()` which read/parse the online CPU list from the kernel.
 - `ui.py` — `CpuPage`: the pinning row (checkboxes) and the parking switch.
-- `initializer.py` — reads the `[cpu]` keys from the base/override texts.
+- `initializer.py` — reads the `[cpu]` keys from the base/override texts; it
+  delegates to `sections/initializer.py`.
 
 ## Notes
 

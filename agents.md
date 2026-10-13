@@ -5,24 +5,32 @@ configuration of the **Feral GameMode** daemon. All code, comments and docs are 
 English; only the translation data (`data/locale/*.xml`) and the desktop entry's
 localised fields are in other languages.
 
-`README.md` is the user-facing document; this file describes the architecture, and
-each `sections/<name>/agents.md` describes one section.
+`README.md` is the user-facing document; this file describes the architecture,
+`sections/agents.md` the shared section machinery, and each
+`sections/<name>/agents.md` one section.
 
 ## Approach: self-contained sections (MVC-like)
 
 The app is a set of independent **sections**, one folder each under `sections/`.
 A section owns its behavior end to end:
 
-- `core.py` — the section's options, its **state**, the logic to render itself to
-  and read itself from `gamemode.ini`, and a **speaking getter/setter per option**
-  (`set_reaper_freq`, ...). The core is the only writer of its state.
+- `options.py` — the section's **options**: the option descriptors that are the
+  single source of truth for its block. Present for the stateful sections.
+- `core.py` — the section's **state**, the logic to render itself to and read
+  itself from `gamemode.ini`, and a **speaking getter/setter per option**
+  (`set_reaper_freq`, ...). The core is the only writer of its state. The common
+  machinery (state, accessors, change notification, reset) lives in
+  `sections/core.py`.
 - `ui.py` — the section page: it builds the widgets and calls the core.
 - `initializer.py` — loads the section's values from the config (and the kernel
-  where relevant) into the state. Present only for stateful sections.
+  where relevant) into the state. Present only for stateful sections; its shared
+  loading logic lives in `sections/initializer.py`.
 
-Sections are deliberately **self-contained**: each defines its own options and its
-own INI (de)serialisation, even at the cost of some duplication. Stateless sections
-(`presentation`, `daemon`) have only `core.py` + `ui.py`.
+Sections are deliberately **self-contained**: each declares its own options
+(`options.py`) and its own render/read rules (`core.py`), sharing only the
+generic machinery (`sections/core.py`) and the loading logic
+(`sections/initializer.py`). Stateless sections (`presentation`, `daemon`) have
+only `core.py` + `ui.py`.
 
 The **general** modules only orchestrate:
 
@@ -61,14 +69,18 @@ gamemode-gui/
 ├── widgets.py         reusable widgets (shared)
 ├── data/              style.css, locale/
 ├── sections/          one folder per section
-│   ├── general/  gpu/  cpu/  custom/   (core.py + ui.py + initializer.py)
+│   ├── core.py                         shared section machinery (state + accessors)
+│   ├── initializer.py                  shared section loading (parse + apply)
+│   ├── general/  gpu/  cpu/  custom/   (options.py + core.py + ui.py + initializer.py)
 │   ├── presentation/                   (core.py + ui.py + presentation.json)
 │   └── daemon/                         (core.py + ui.py)
 └── test/              test_engine.py, test_app.py, smoke_test.py
 ```
 
-Only these pieces are shared: `spec.py`, `widgets.py`, `i18n.py`, `fileops.py` and
-`privileged.py`. Everything else lives with its section.
+Only these pieces are shared: `spec.py`, `widgets.py`, `i18n.py`, `fileops.py`,
+`privileged.py`, `sections/core.py` (the common section machinery) and
+`sections/initializer.py` (the common section-loading logic). Everything else
+lives with its section.
 
 ## Conventions
 

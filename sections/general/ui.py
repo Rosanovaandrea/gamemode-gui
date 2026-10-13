@@ -51,7 +51,7 @@ class GeneralPage(Gtk.Box):
     def _make_row(self, spec) -> OptionRow:
         """Build one editable row, wired to the core's setter, and track it."""
         # The section supplies the allowed values (kernel-derived ones included).
-        row = OptionRow(spec, choices=self.core.choices_for(spec))
+        row = OptionRow(spec, choices=self.core.allowed_values_for(spec))
         self._populate_row(row)
         # A change in the widget pushes the new value into the core.
         row._on_change = lambda _key, _row=row: self._on_row_change(_row)
@@ -79,7 +79,7 @@ class GeneralPage(Gtk.Box):
                 continue
             dependency = next((spec for spec in self.core.options
                                if spec.key == row.spec.depends_on), None)
-            row.set_enabled(self.core.is_active(dependency) if dependency else True)
+            row.set_enabled(self.core.is_option_active(dependency) if dependency else True)
 
 
 def build_page(core):

@@ -130,7 +130,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Any section change marks the window dirty and refreshes the gating.
         for section in self.core.sections:
-            section.subscribe(lambda _key: self._on_state_changed())
+            section.subscribe_change_listener(lambda _key: self._on_state_changed())
 
         self._build_ui()
         self._warn_language_errors()

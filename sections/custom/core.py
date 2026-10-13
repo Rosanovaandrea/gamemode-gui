@@ -1,44 +1,22 @@
-"""Core of the Custom section: state, options and INI (de)serialisation.
+"""Core of the Custom section: state and INI (de)serialisation.
 
 Self-contained section for the ``[custom]`` keys: the start/end script lists and
-the notification switches. A ``toggle_entry`` switch adds/removes a fixed string
-to/from a target list; the string is stripped from the list when read and
-re-added at render time, so there is a single source of truth for each entry.
+the notification switches; the options live in :mod:`sections.custom.options` and
+the shared core machinery is in :mod:`sections.core`. A ``toggle_entry`` switch
+adds/removes a fixed string to/from a target list; the string is stripped from
+the list when read and re-added at render time, so there is a single source of
+truth for each entry.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List
+from typing import Dict, List
 
+from sections.core import SectionCore
+from sections.custom.options import CUSTOM_OPTIONS
 from spec import OptionSpec
 
 SECTION_ID = "custom"
-
-CUSTOM_OPTIONS: List[OptionSpec] = [
-    OptionSpec(
-        key="notify_start", type="toggle_entry", default=False,
-        label_id="opt.custom.notify_start.label",
-        description_id="opt.custom.notify_start",
-        target="start", entry='notify-send "GameMode started"'),
-    OptionSpec(
-        key="notify_end", type="toggle_entry", default=False,
-        label_id="opt.custom.notify_end.label",
-        description_id="opt.custom.notify_end",
-        target="end", entry='notify-send "GameMode ended"'),
-    OptionSpec(
-        key="start", type="list", default=[],
-        description_id="opt.custom.start",
-        comment="; Custom scripts executed (via /bin/sh) when GameMode starts"),
-    OptionSpec(
-        key="end", type="list", default=[],
-        description_id="opt.custom.end",
-        comment="; Custom scripts executed (via /bin/sh) when GameMode ends"),
-    OptionSpec(
-        key="script_timeout", type="int", default=10, min_value=0,
-        description_id="opt.custom.script_timeout",
-        comment="; Timeout for scripts (seconds). Scripts are killed if they do "
-                "not complete in time."),
-]
 
 
 def escape_value(text: str) -> str:
@@ -49,153 +27,100 @@ def escape_value(text: str) -> str:
     return text
 
 
-class CustomState:
-    """Values chosen by the user for the ``[custom]`` section."""
-
-    def __init__(self) -> None:
-        for spec in CUSTOM_OPTIONS:
-            setattr(self, spec.key, spec.default)
-
-
-class CustomCore:
+class CustomCore(SectionCore):
     """State and logic of the ``[custom]`` section."""
 
     section_id = SECTION_ID
     options = CUSTOM_OPTIONS
 
-    def __init__(self) -> None:
-        """Create the section state and install the speaking option accessors."""
-        self.state = CustomState()
-        self._listeners: List[Callable[[str], None]] = []
-        self._install_accessors()
-
-    def subscribe(self, listener: Callable[[str], None]) -> None:
-        """Register a view callback; it receives the option key that changed."""
-        self._listeners.append(listener)
-
-    def _notify(self, changed_key: str) -> None:
-        """Notify every subscribed view that one option changed."""
-        for listener in self._listeners:
-            listener(changed_key)
-
-    def _install_accessors(self) -> None:
-        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
-        for spec in self.options:
-            setattr(self, f"get_{spec.key}", self._make_getter(spec.key))
-            setattr(self, f"set_{spec.key}", self._make_setter(spec.key))
-
-    def _make_getter(self, key: str):
-        """Return the ``get_<key>`` closure that reads one option from the state."""
-        def get_option_value():
-            return getattr(self.state, key)
-        get_option_value.__name__ = f"get_{key}"
-        return get_option_value
-
-    def _make_setter(self, key: str):
-        """Return the ``set_<key>`` closure that writes one option and notifies."""
-        def set_option_value(value) -> None:
-            setattr(self.state, key, value)
-            self._notify(key)
-        set_option_value.__name__ = f"set_{key}"
-        return set_option_value
-
-    def choices_for(self, spec: OptionSpec) -> List[str]:
-        """Allowed values of an option (the ``[custom]`` options are all static)."""
-        return list(spec.choices or [])
-
-    def _effective_list(self, spec: OptionSpec) -> List[str]:
+    def _effective_list_value(self, option: OptionSpec) -> List[str]:
         """The list value plus the fixed strings of its active toggle entries."""
-        items: List[str] = []
-        for toggle in self.options:
+        list_items: List[str] = []
+        for toggle_option in self.options:
             # An active toggle targeting this list contributes its fixed string first.
-            if (toggle.type == "toggle_entry" and toggle.target == spec.key
-                    and getattr(self.state, toggle.key)):
-                items.append(toggle.entry)
+            if (toggle_option.type == "toggle_entry"
+                    and toggle_option.target == option.key
+                    and getattr(self.state, toggle_option.key)):
+                list_items.append(toggle_option.entry)
         # Then come the free-form items the user typed in the list editor.
-        items.extend(getattr(self.state, spec.key) or [])
-        return items
+        list_items.extend(getattr(self.state, option.key) or [])
+        return list_items
 
-    def is_active(self, spec: OptionSpec) -> bool:
+    def is_option_active(self, option: OptionSpec) -> bool:
         """True if an option is active (a non-empty list, or a set switch)."""
-        if spec.type == "list":
-            return bool(self._effective_list(spec))
-        if spec.type == "bool":
-            return bool(getattr(self.state, spec.key)) != bool(spec.default)
-        return bool(getattr(self.state, spec.key))
+        if option.type == "list":
+            return bool(self._effective_list_value(option))
+        if option.type == "bool":
+            return bool(getattr(self.state, option.key)) != bool(option.default)
+        return bool(getattr(self.state, option.key))
 
-    def reset(self) -> None:
-        """Reset every option of this section to its default value."""
-        for spec in self.options:
-            setattr(self.state, spec.key, spec.default)
-
-    def render(self) -> str:
+    def render_ini_section(self) -> str:
         """Render the ``[custom]`` section, only with active options."""
-        lines: List[str] = []
-        for spec in self.options:
+        rendered_lines: List[str] = []
+        for option in self.options:
             # A toggle_entry has no line of its own: it acts on the target list.
-            if spec.type == "toggle_entry":
+            if option.type == "toggle_entry":
                 continue
             # A list is written as repeated keys: one line per item.
-            if spec.type == "list":
-                items = self._effective_list(spec)
-                if not items:
+            if option.type == "list":
+                list_items = self._effective_list_value(option)
+                if not list_items:
                     continue
-                if spec.comment:
-                    lines.append(spec.comment)
-                for item in items:
-                    lines.append(spec.template.format(value=escape_value(item)))
+                if option.comment:
+                    rendered_lines.append(option.comment)
+                for list_item in list_items:
+                    escaped_item = escape_value(list_item)
+                    rendered_lines.append(option.template.format(value=escaped_item))
                 continue
             # A scalar (e.g. the script timeout) is written only if activated.
-            value = getattr(self.state, spec.key)
-            if value is None or value == spec.default:
+            value = getattr(self.state, option.key)
+            if value is None or value == option.default:
                 continue
-            if spec.comment:
-                lines.append(spec.comment)
-            lines.append(spec.template.format(value=value))
-        if not lines:
+            if option.comment:
+                rendered_lines.append(option.comment)
+            rendered_lines.append(option.template.format(value=value))
+        if not rendered_lines:
             return ""
         # Wrap the active lines in the section header; the file ends with "\n".
-        return f"[{self.section_id}]\n" + "\n".join(lines) + "\n"
+        return f"[{self.section_id}]\n" + "\n".join(rendered_lines) + "\n"
 
-    def apply(self, section: Dict[str, List[str]], append: bool = False) -> None:
+    def apply_parsed_section(self, parsed_section: Dict[str, List[str]],
+                             append: bool = False) -> None:
         """Apply the parsed ``[custom]`` values (``key -> [raw values]``).
 
         With ``append`` the list options extend the current value (as GameMode
         does when merging the installed base with the ``/etc`` override).
         """
-        for spec in self.options:
-            raw_values = section.get(spec.key)
-            if not raw_values:
+        for option in self.options:
+            raw_option_values = parsed_section.get(option.key)
+            if not raw_option_values:
                 continue
-            if spec.type == "list":
-                parsed = [raw.strip() for raw in raw_values if raw.strip()]
+            if option.type == "list":
+                parsed_items = [raw_item.strip() for raw_item in raw_option_values
+                                if raw_item.strip()]
                 if append:
-                    parsed = list(getattr(self.state, spec.key)) + parsed
-                setattr(self.state, spec.key, parsed)
-            elif spec.type == "toggle_entry":
-                setattr(self.state, spec.key, True)
+                    current_items = getattr(self.state, option.key)
+                    parsed_items = list(current_items) + parsed_items
+                setattr(self.state, option.key, parsed_items)
+            elif option.type == "toggle_entry":
+                setattr(self.state, option.key, True)
             else:
-                raw = raw_values[-1]
+                raw_value = raw_option_values[-1]
                 try:
-                    setattr(self.state, spec.key, int(raw))
+                    setattr(self.state, option.key, int(raw_value))
                 except ValueError:
                     pass
-        self._extract_toggle_entries()
+        self._extract_toggle_entries_from_lists()
 
-    def _extract_toggle_entries(self) -> None:
+    def _extract_toggle_entries_from_lists(self) -> None:
         """Turn a managed string found in a list into its switch and drop it."""
-        for toggle in self.options:
-            if toggle.type != "toggle_entry" or not toggle.target or not toggle.entry:
+        for toggle_option in self.options:
+            if (toggle_option.type != "toggle_entry"
+                    or not toggle_option.target or not toggle_option.entry):
                 continue
-            target = getattr(self.state, toggle.target)
-            if isinstance(target, list) and toggle.entry in target:
-                setattr(self.state, toggle.key, True)
-                setattr(self.state, toggle.target,
-                        [item for item in target if item != toggle.entry])
-
-    def apply_values(self, values: Dict[str, object]) -> None:
-        """Set typed values (e.g. from the saved session) for this section."""
-        for spec in self.options:
-            full_key = f"{self.section_id}.{spec.key}"
-            if full_key in values:
-                setattr(self.state, spec.key, values[full_key])
+            target_items = getattr(self.state, toggle_option.target)
+            if isinstance(target_items, list) and toggle_option.entry in target_items:
+                setattr(self.state, toggle_option.key, True)
+                remaining_items = [item for item in target_items
+                                   if item != toggle_option.entry]
+                setattr(self.state, toggle_option.target, remaining_items)

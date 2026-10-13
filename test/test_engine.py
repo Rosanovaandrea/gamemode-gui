@@ -17,49 +17,48 @@ os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="gamemodegui_engine_")
 import i18n  # noqa: E402
 from sections.cpu.core import CpuCore, available_cores, expand_cpu_list  # noqa: E402
 from sections.custom.core import CustomCore  # noqa: E402
-from sections.general.core import (  # noqa: E402
-    GENERAL_OPTIONS, GeneralCore, available_governors,
-)
+from sections.general.core import GeneralCore, available_governors  # noqa: E402
+from sections.general.options import GENERAL_OPTIONS  # noqa: E402
 from sections.gpu.core import GpuCore  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # General: render only active options + roundtrip + kernel governors
 # ---------------------------------------------------------------------------
 general = GeneralCore()
-assert general.render() == ""
+assert general.render_ini_section() == ""
 assert general.get_reaper_freq() == 5
 assert general.get_desiredgov() == "performance"
 assert available_governors()
 governor_option = next(spec for spec in GENERAL_OPTIONS if spec.key == "desiredgov")
-assert general.choices_for(governor_option) == available_governors()
+assert general.allowed_values_for(governor_option) == available_governors()
 softrealtime_option = next(spec for spec in GENERAL_OPTIONS if spec.key == "softrealtime")
-assert general.choices_for(softrealtime_option) == ["auto", "on", "off"]
+assert general.allowed_values_for(softrealtime_option) == ["auto", "on", "off"]
 
 general.set_reaper_freq(10)
 general.set_inhibit_screensaver(False)
 general.set_desiredgov("powersave")
-general_text = general.render()
+general_text = general.render_ini_section()
 assert "reaper_freq=10" in general_text
 assert "inhibit_screensaver=0" in general_text
 assert "desiredgov=powersave" in general_text
 assert "renice" not in general_text and "disable_splitlock" not in general_text
 
 reloaded = GeneralCore()
-reloaded.apply({"reaper_freq": ["10"], "inhibit_screensaver": ["0"],
-                "desiredgov": ["powersave"]})
-assert reloaded.render() == general_text
+reloaded.apply_parsed_section({"reaper_freq": ["10"], "inhibit_screensaver": ["0"],
+                               "desiredgov": ["powersave"]})
+assert reloaded.render_ini_section() == general_text
 print("== general core OK")
 
 # ---------------------------------------------------------------------------
 # GPU: dependent options are written only when the master switch is on
 # ---------------------------------------------------------------------------
 gpu = GpuCore()
-assert gpu.render() == ""
+assert gpu.render_ini_section() == ""
 gpu.set_gpu_device(2)
-assert gpu.render() == ""                       # master off -> nothing written
+assert gpu.render_ini_section() == ""                       # master off -> nothing written
 gpu.set_apply_gpu_optimisations("accept-responsibility")
-assert gpu.is_active(gpu.options[0])
-gpu_text = gpu.render()
+assert gpu.is_option_active(gpu.options[0])
+gpu_text = gpu.render_ini_section()
 assert "apply_gpu_optimisations=accept-responsibility" in gpu_text
 assert "gpu_device=2" in gpu_text
 print("== gpu core OK")
@@ -72,10 +71,10 @@ assert available_cores() and all(core.isdigit() for core in available_cores())
 cpu = CpuCore()
 cpu.set_pin_cores([0, 2, 4])
 cpu.set_park_cores(True)
-cpu_text = cpu.render()
+cpu_text = cpu.render_ini_section()
 assert "pin_cores=0,2,4" in cpu_text and "park_cores=1" in cpu_text
 cpu_reloaded = CpuCore()
-cpu_reloaded.apply({"pin_cores": ["0-2"], "park_cores": ["1"]})
+cpu_reloaded.apply_parsed_section({"pin_cores": ["0-2"], "park_cores": ["1"]})
 assert cpu_reloaded.get_pin_cores() == [0, 1, 2]
 assert cpu_reloaded.get_park_cores() is True
 print("== cpu core OK")
@@ -84,27 +83,27 @@ print("== cpu core OK")
 # Custom: script lists (repeated keys) + notification toggles + append
 # ---------------------------------------------------------------------------
 custom = CustomCore()
-assert custom.render() == ""
+assert custom.render_ini_section() == ""
 custom.set_start(["notify-send hi", "echo bye"])
 custom.set_end(["cleanup.sh"])
 custom.set_script_timeout(20)
-custom_text = custom.render()
+custom_text = custom.render_ini_section()
 assert "start=notify-send hi" in custom_text and "start=echo bye" in custom_text
 assert "end=cleanup.sh" in custom_text and "script_timeout=20" in custom_text
 
 custom.set_notify_start(True)
-custom_text = custom.render()
+custom_text = custom.render_ini_section()
 assert 'start=notify-send "GameMode started"' in custom_text
 assert (custom_text.index('start=notify-send "GameMode started"')
         < custom_text.index("start=notify-send hi"))
 
 merged = CustomCore()
-merged.apply({"start": ["base1"]})
-merged.apply({"start": ["over1"]}, append=True)
+merged.apply_parsed_section({"start": ["base1"]})
+merged.apply_parsed_section({"start": ["over1"]}, append=True)
 assert merged.get_start() == ["base1", "over1"]
 
 extracted = CustomCore()
-extracted.apply({"start": ['notify-send "GameMode started"', "echo x"]})
+extracted.apply_parsed_section({"start": ['notify-send "GameMode started"', "echo x"]})
 assert extracted.get_notify_start() is True
 assert extracted.get_start() == ["echo x"]
 print("== custom core OK")

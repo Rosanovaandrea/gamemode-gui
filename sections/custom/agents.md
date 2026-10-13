@@ -2,17 +2,18 @@
 
 Manages the `[custom]` keys: the scripts run when GameMode starts/ends, the two
 notification switches and the script timeout. The options live in `CUSTOM_OPTIONS`
-in `core.py`.
+in `options.py`.
 
 ## Files
 
-- `core.py` — `CUSTOM_OPTIONS`, `CustomState` and `CustomCore`. Handles the
-  `toggle_entry` coupling (`_effective_list`) and the list merge on read
-  (`apply(..., append=True)`).
+- `options.py` — `CUSTOM_OPTIONS`, the option descriptors (the `[custom]` keys).
+- `core.py` — `CustomCore` (extends `SectionCore`). Handles the
+  `toggle_entry` coupling (`_effective_list_value`) and the list merge on read
+  (`apply_parsed_section(..., append=True)`).
 - `ui.py` — `CustomPage`: the **notifications card** at the top (the two
   `toggle_entry` switches) plus the list editors and the timeout stepper.
 - `initializer.py` — reads the `[custom]` keys; the start/end lists are **appended**
-  (base, then override), as GameMode does.
+  (base, then override), as GameMode does. It delegates to `sections/initializer.py`.
 
 ## Notes
 
