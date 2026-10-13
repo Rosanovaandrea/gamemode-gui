@@ -1,8 +1,8 @@
 # Section: presentation (stateless)
 
-The tab shown by default: a text page explaining what GameMode is, how to launch a
-game with `gamemoderun`, Steam/Lutris hints and a disclaimer. It holds no state and
-has no initializer.
+The tab shown by default: a **guide** that introduces GameMode, explains how to
+launch a game with `gamemoderun` (Steam/Lutris hints) and how to use each section
+of the GUI, and ends with a disclaimer. It holds no state and has no initializer.
 
 ## Files
 
@@ -11,8 +11,8 @@ has no initializer.
   warnings. A missing/broken file yields an empty presentation.
 - `ui.py` — `PresentationPage` renders the blocks; a warning block becomes a card
   with a warning icon.
-- `presentation.json` — the block **structure**; the **texts** live in the language
-  files.
+- `presentation.json` — the block **structure** (introduction + per-section guide);
+  the **texts** live in the language files.
 
 ## Notes
 

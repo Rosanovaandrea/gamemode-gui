@@ -22,7 +22,7 @@
   <entry id="nav.close">Close</entry>
 
   <!-- ===== Tabs ===== -->
-  <entry id="tab.presentation">Introduction</entry>
+  <entry id="tab.presentation">Guide</entry>
   <entry id="tab.general">General</entry>
   <entry id="tab.gpu">GPU</entry>
   <entry id="tab.cpu">CPU</entry>
@@ -128,8 +128,8 @@
   <entry id="msg.lang.empty">No valid language found: using English.</entry>
 
   <!-- ===== Introduction ===== -->
-  <entry id="presentation.title">Introduction</entry>
-  <entry id="presentation.subtitle">What GameMode is, how to launch games with the optimisations, and what to know before configuring.</entry>
+  <entry id="presentation.title">Guide</entry>
+  <entry id="presentation.subtitle">What GameMode is, how to launch games with the optimisations, and how to use each section of the GUI.</entry>
 
   <entry id="presentation.what.heading">What GameMode is</entry>
   <entry id="presentation.what.body">GameMode is a set of Linux optimisations applied temporarily (and then reverted) when you launch a game. When a game requests it, the gamemoded daemon changes system settings on the fly such as the CPU governor, process priority, I/O priority, the scheduler and — on supported hardware — the GPU power state. The goal is to reduce stutter and latency and give the game more resources, returning to normal when it exits.</entry>
@@ -145,6 +145,24 @@
 
   <entry id="presentation.lutris.heading">Lutris</entry>
   <entry id="presentation.lutris.body">In Lutris, open the game's configuration (right-click → Configure) and in the System options tab enable the "Enable GameMode" option, if available. To do it manually, set a run prefix with gamemoderun, keeping %command% as the game command.</entry>
+
+  <entry id="presentation.guide.heading">Using the GUI</entry>
+  <entry id="presentation.guide.body">The app is organised in tabs, one per section of gamemode.ini. Edit the options you want and use the action bar at the bottom, always available: Save writes the whole file, Restore previous backup brings back the last saved state, Restore original returns to the pristine configuration. After saving, restart the GameMode daemon from the Daemon tab so the changes take effect. Only non-default values are written, so the file stays readable.</entry>
+
+  <entry id="presentation.guide.general.heading">General</entry>
+  <entry id="presentation.guide.general.body">The main GameMode behaviour: how often the reaper thread checks, the CPU governor on entering and leaving game mode, the iGPU governor and load threshold, soft real-time scheduling, renice, I/O priority, screensaver inhibition and split-lock mitigation. Start here.</entry>
+
+  <entry id="presentation.guide.gpu.heading">GPU</entry>
+  <entry id="presentation.guide.gpu.body">NVIDIA and AMD power states and clock offsets. The master switch must be enabled for the other options to be written, and it only takes effect when the file is at /etc/gamemode.ini. Change one value at a time and check stability.</entry>
+
+  <entry id="presentation.guide.cpu.heading">CPU</entry>
+  <entry id="presentation.guide.cpu.body">Pin the game to a chosen set of cores (better consistency) and park the unused cores (less heat and power). Parking requires membership in the 'gamemode' group, which you can request from the Daemon tab.</entry>
+
+  <entry id="presentation.guide.custom.heading">Custom scripts</entry>
+  <entry id="presentation.guide.custom.body">Commands run, via /bin/sh, when GameMode starts and ends, the two desktop notifications and the timeout after which a stuck script is killed. One line = one command.</entry>
+
+  <entry id="presentation.guide.daemon.heading">Daemon</entry>
+  <entry id="presentation.guide.daemon.body">Restart gamemoded after saving, run the diagnostics and read the version, and add your user to the 'gamemode' group (needed for renice and core parking). A logout/login is required after joining the group.</entry>
 
   <entry id="presentation.disclaimer.heading">Disclaimer</entry>
   <entry id="presentation.disclaimer.body">Some options (especially the GPU/iGPU ones) may not be supported or may not work correctly on laptops, due to different thermal and power management. In general, changing the governor, platform profiles, GPU power state and system priorities can reduce the machine's stability (crashes, freezes, reboots, overheating). Apply one change at a time, check the result, and keep the "Restore backup" and "Restore original" buttons in the Summary tab within reach. GPU optimisations only take effect if the file is at /etc/gamemode.ini and require the responsibility acceptance switch.</entry>

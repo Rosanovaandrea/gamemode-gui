@@ -29,6 +29,36 @@
       "body_id": "presentation.lutris.body"
     },
     {
+      "id": "guide",
+      "heading_id": "presentation.guide.heading",
+      "body_id": "presentation.guide.body"
+    },
+    {
+      "id": "guide-general",
+      "heading_id": "presentation.guide.general.heading",
+      "body_id": "presentation.guide.general.body"
+    },
+    {
+      "id": "guide-gpu",
+      "heading_id": "presentation.guide.gpu.heading",
+      "body_id": "presentation.guide.gpu.body"
+    },
+    {
+      "id": "guide-cpu",
+      "heading_id": "presentation.guide.cpu.heading",
+      "body_id": "presentation.guide.cpu.body"
+    },
+    {
+      "id": "guide-custom",
+      "heading_id": "presentation.guide.custom.heading",
+      "body_id": "presentation.guide.custom.body"
+    },
+    {
+      "id": "guide-daemon",
+      "heading_id": "presentation.guide.daemon.heading",
+      "body_id": "presentation.guide.daemon.body"
+    },
+    {
       "id": "disclaimer",
       "heading_id": "presentation.disclaimer.heading",
       "body_id": "presentation.disclaimer.body",
