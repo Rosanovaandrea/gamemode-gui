@@ -6,11 +6,12 @@ initializer.
 
 ## Files
 
+- `core.py` — the daemon actions and their command constants (`test_daemon`,
+  `daemon_version`, `restart_daemon`, the group helpers). It uses the shared
+  `services.commands` helpers (`find_executable`, `run_command`,
+  `CommandResult`).
 - `ui.py` — `DaemonPage`: the action cards, the group card and the console. The
-  window connects its buttons to `services.daemon` and displays the raw output.
-- The system operations live in `services/commands.py` and `services/daemon.py`
-  (`find_executable`, `run_command`, `test_daemon`, `daemon_version`,
-  `restart_daemon`, the group helpers and the shared `CommandResult`).
+  window connects its buttons to `core.py` and displays the raw output.
 
 ## Notes
 

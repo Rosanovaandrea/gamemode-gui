@@ -15,7 +15,7 @@ testable libraries:
 | `i18n` | gettext catalogs, language detection and `settings.json` |
 | `state` | application store, change notifications and dirty flag |
 | `configuration.py` | paths, INI slices, session, atomic copy-on-write |
-| `services` | commands, pkexec/sudo, daemon actions, root helper |
+| `services` | commands, pkexec/sudo and root helper |
 | `sections` | the self-contained `gamemode.ini` sections |
 | `ui` | window, pages and the reusable widget library |
 
@@ -63,7 +63,7 @@ gamemode-gui/
 ├── initializer.py             build/reload the application
 ├── spec.py                    OptionSpec
 ├── configuration.py           read/write gamemode.ini atomically
-├── services/                  commands, privileged, daemon, helper
+├── services/                  commands, privileged, helper
 ├── i18n/                      gettext + settings
 ├── state/                     application store
 ├── sections/                  one folder per section
@@ -80,7 +80,7 @@ gamemode-gui/
 - Every visible string goes through `tr("key")`.
 - GTK is used only in `ui` and the section `ui.py` files; cores and
   services stay headless and testable without a display.
-- Reducers stay pure; side effects belong to services or `AppCore`.
+- Side effects belong to services, `Configuration` or `AppCore`.
 
 ## Testing
 

@@ -8,7 +8,9 @@ from typing import Optional
 
 from i18n.translator import tr
 
-from .commands import CommandResult, find_executable, privileged_prefixes, run_command
+from services.commands import (
+    CommandResult, find_executable, privileged_prefixes, run_command,
+)
 
 GAMEMODED = "gamemoded"
 GAMEMODED_PATHS = ("/usr/bin/gamemoded", "/usr/local/bin/gamemoded")

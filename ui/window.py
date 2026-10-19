@@ -23,7 +23,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 from i18n.settings import describe_lang_errors, ensure_settings, save_lang
 from i18n.translator import current_lang, tr
 from initializer import App, build_app, reload
-from services.daemon import (
+from sections.daemon.core import (
     GROUP_COMMAND, RESTART_COMMAND, TEST_COMMAND, VERSION_COMMAND,
     add_user_to_group, daemon_version, restart_daemon, test_daemon,
 )

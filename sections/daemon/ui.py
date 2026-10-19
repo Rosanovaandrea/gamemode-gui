@@ -13,7 +13,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
 from i18n.translator import tr
-from services.daemon import group_exists, user_in_group
+from sections.daemon.core import group_exists, user_in_group
 from ui.widgets.page_header import PageHeader
 
 
