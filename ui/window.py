@@ -24,6 +24,7 @@ import i18n, initializer
 from i18n import tr
 from initializer import App, SECTION_MODULES
 from sections.daemon import core as daemon
+from ui.widgets import PageHeader
 
 # The application stylesheet is owned by the general window.
 _STYLE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -87,14 +88,10 @@ class SummaryPage(Gtk.Box):
     def __init__(self, application_core, config_path: str,
                  base_path: Optional[str]) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("summary-page")
         self.application_core = application_core
 
-        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        header.append(Gtk.Label(label=tr("step.summary.title"), xalign=0.0,
-                                css_classes=["title-2"]))
-        header.append(Gtk.Label(label=tr("step.summary.subtitle"), xalign=0.0,
-                                css_classes=["dim-label"], wrap=True))
-        self.append(header)
+        self.append(PageHeader("step.summary.title", "step.summary.subtitle"))
         if config_path:
             self.append(Gtk.Label(label=tr("summary.path").format(path=config_path),
                                   xalign=0.0, wrap=True, css_classes=["dim-label"]))
@@ -103,8 +100,8 @@ class SummaryPage(Gtk.Box):
                                   xalign=0.0, wrap=True, css_classes=["dim-label"]))
 
         scroller = Gtk.ScrolledWindow(vexpand=True)
-        view = Gtk.TextView(editable=False, monospace=True,
-                            wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        view = Gtk.TextView(editable=False, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        view.add_css_class("summary-view")
         self._buffer = view.get_buffer()
         scroller.set_child(view)
         self.append(scroller)
@@ -221,10 +218,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.set_title_widget(switcher)
 
         wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        wrapper.set_margin_top(12)
-        wrapper.set_margin_bottom(12)
-        wrapper.set_margin_start(16)
-        wrapper.set_margin_end(16)
+        wrapper.add_css_class("page-wrapper")
         wrapper.append(self.stack)
         toolbar.set_content(wrapper)
         self.connect("close-request", self._on_close_request)

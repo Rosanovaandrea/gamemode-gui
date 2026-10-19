@@ -18,10 +18,7 @@ class OptionRow(Gtk.Box):
     def __init__(self, spec, on_change: Optional[Callable[[str], None]] = None,
                  choices: Optional[List[str]] = None) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        for margin in ("top", "bottom"):
-            getattr(self, f"set_margin_{margin}")(8)
-        for margin in ("start", "end"):
-            getattr(self, f"set_margin_{margin}")(12)
+        self.add_css_class("option-row")
         self.spec = spec
         self._on_change = on_change or (lambda _key: None)
         self._suppress = False
@@ -58,7 +55,5 @@ class OptionRow(Gtk.Box):
         return self._input.get_value()
 
     def set_enabled(self, enabled: bool) -> None:
-        enabled = bool(enabled)
+        """Enable/disable the row; the theme styles the insensitive state."""
         self.set_sensitive(enabled)
-        self._input.set_sensitive(enabled)
-        self.set_opacity(1.0 if enabled else 0.5)

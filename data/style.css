@@ -1,9 +1,41 @@
 /* GameMode GUI application style.
  *
- * Loaded by ui.install_app_css() (at APPLICATION priority on the display), so it
- * can override the theme style. The @accent_* colours come from the system theme
- * (the same orange/blue as the main buttons).
+ * Loaded by the general window at APPLICATION priority, so it can override the
+ * theme style. The @accent_* colours come from the system theme.
+ *
+ * Layout margins live here instead of in the widget constructors.
  */
+
+/* Page and card spacing. */
+.page-wrapper {
+  margin: 12px 16px;
+}
+
+.section-card,
+.daemon-card {
+  margin: 4px;
+}
+
+.section-card-title {
+  margin: 8px 12px 4px 12px;
+}
+
+.presentation-content {
+  margin: 4px 0;
+}
+
+.presentation-warning {
+  margin: 12px;
+}
+
+.option-row {
+  margin: 8px 12px;
+}
+
+/* Monospaced, read-only text views. */
+.summary-view, .summary-view text {
+  font-family: monospace;
+}
 
 /* Simulated console of the Daemon tab: terminal-like look. */
 .console, .console text {

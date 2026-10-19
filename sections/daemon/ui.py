@@ -14,6 +14,7 @@ from gi.repository import Gtk
 
 from i18n import tr
 from sections.daemon import core
+from ui.widgets import PageHeader
 
 
 class DaemonPage(Gtk.Box):
@@ -21,24 +22,14 @@ class DaemonPage(Gtk.Box):
 
     def __init__(self, window) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("daemon-page")
         self.window = window
-
-        self.append(self._page_header())
+        self.append(PageHeader("tab.daemon.title", "tab.daemon.subtitle"))
         self.append(self._actions_card())
         self.append(self._group_card())
         self.append(self._console_header())
         self.append(self._console())
-
         self.refresh_group()
-
-    def _page_header(self) -> Gtk.Widget:
-        """Build the page header: section title + subtitle."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.append(Gtk.Label(label=tr("tab.daemon.title"), xalign=0.0,
-                             css_classes=["title-2"]))
-        box.append(Gtk.Label(label=tr("tab.daemon.subtitle"), xalign=0.0,
-                             css_classes=["dim-label"], wrap=True))
-        return box
 
     def _actions_card(self) -> Gtk.Widget:
         """Card with the daemon actions: restart and run the diagnostics."""
@@ -81,7 +72,7 @@ class DaemonPage(Gtk.Box):
 
     def _console(self) -> Gtk.Widget:
         """Read-only, monospaced console that shows the raw command output."""
-        self._console_view = Gtk.TextView(editable=False, monospace=True,
+        self._console_view = Gtk.TextView(editable=False,
                                           wrap_mode=Gtk.WrapMode.WORD_CHAR,
                                           cursor_visible=False)
         self._console_view.add_css_class("console")
@@ -95,8 +86,7 @@ class DaemonPage(Gtk.Box):
         """Create an empty card (rounded box with small internal margins)."""
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         card.add_css_class("card")
-        for margin in ("top", "bottom", "start", "end"):
-            getattr(card, f"set_margin_{margin}")(4)
+        card.add_css_class("daemon-card")
         return card
 
     # -- console -------------------------------------------------------------

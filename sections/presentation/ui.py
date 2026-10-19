@@ -13,6 +13,7 @@ from gi.repository import Gtk
 
 from i18n import tr
 from sections.presentation import core
+from ui.widgets import PageHeader
 
 
 class PresentationPage(Gtk.Box):
@@ -20,19 +21,13 @@ class PresentationPage(Gtk.Box):
 
     def __init__(self) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("presentation-page")
         presentation = core.PRESENTATION
-
-        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        header.append(Gtk.Label(label=tr(presentation.title_id), xalign=0.0,
-                                css_classes=["title-2"]))
-        header.append(Gtk.Label(label=tr(presentation.subtitle_id), xalign=0.0,
-                                css_classes=["dim-label"], wrap=True))
-        self.append(header)
+        self.append(PageHeader(presentation.title_id, presentation.subtitle_id))
 
         scroller = Gtk.ScrolledWindow(vexpand=True)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        content.set_margin_top(4)
-        content.set_margin_bottom(4)
+        content.add_css_class("presentation-content")
         for block in presentation.blocks:
             content.append(_presentation_block(block))
         scroller.set_child(content)
@@ -53,8 +48,7 @@ def _presentation_block(block) -> Gtk.Widget:
 
     box.add_css_class("card")
     inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-    for margin in ("top", "bottom", "start", "end"):
-        getattr(inner, f"set_margin_{margin}")(12)
+    inner.add_css_class("presentation-warning")
     icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
     icon.set_valign(Gtk.Align.START)
     text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)

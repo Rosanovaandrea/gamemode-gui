@@ -11,7 +11,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
 
 from i18n import tr
-from ui.widgets import OptionRow
+from ui.widgets import OptionRow, PageHeader
 
 
 class SectionPage(Gtk.Box):
@@ -23,6 +23,7 @@ class SectionPage(Gtk.Box):
                  card_types: Iterable[str] = (),
                  exclude_types: Iterable[str] = ()) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("section-page")
         self.core = core
         self.rows: List[OptionRow] = []
         self._card_types = tuple(card_types)
@@ -32,28 +33,18 @@ class SectionPage(Gtk.Box):
             banner = Adw.Banner(title=tr(banner_id))
             banner.add_css_class("error")
             self.append(banner)
-        self.append(self._header(title_id, subtitle_id))
+        self.append(PageHeader(title_id, subtitle_id))
         if self._card_types and card_title_id:
             self.append(self._card(card_title_id))
         self.append(self._option_list())
         self.refresh_gating()
 
-    def _header(self, title_id: str, subtitle_id: str) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.append(Gtk.Label(label=tr(title_id), xalign=0.0, css_classes=["title-2"]))
-        box.append(Gtk.Label(label=tr(subtitle_id), xalign=0.0,
-                             css_classes=["dim-label"], wrap=True))
-        return box
-
     def _card(self, title_id: str) -> Gtk.Widget:
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         card.add_css_class("card")
-        for margin in ("top", "bottom", "start", "end"):
-            getattr(card, f"set_margin_{margin}")(4)
-        title = Gtk.Label(label=tr(title_id), xalign=0.0, css_classes=["heading"])
-        title.set_margin_start(12)
-        title.set_margin_top(8)
-        title.set_margin_bottom(4)
+        card.add_css_class("section-card")
+        title = Gtk.Label(label=tr(title_id), xalign=0.0, css_classes=["heading",
+                                                                       "section-card-title"])
         card.append(title)
         listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         for spec in self.core.options:
