@@ -18,7 +18,8 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import i18n
-from core import AppCore, load_session, resolve_base_path, resolve_config_path
+from core import AppCore
+from gamemode_gui.config import load_session, read_text, resolve_base_path, resolve_config_path
 from gamemode_gui.state import AppStore
 from sections.cpu import initializer as cpu_initializer
 from sections.cpu.core import CpuCore
@@ -47,17 +48,6 @@ class App:
     base_path: Optional[str]
 
 
-def _read_text(path: Optional[str]) -> str:
-    """Read a text file, returning an empty string if it is missing/unreadable."""
-    if path and os.path.isfile(path):
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                return handle.read()
-        except OSError:
-            pass
-    return ""
-
-
 def _configuration_texts(config_path: str) -> Tuple[str, str, Optional[Dict[str, object]]]:
     """Read the base and override texts.
 
@@ -67,8 +57,8 @@ def _configuration_texts(config_path: str) -> Tuple[str, str, Optional[Dict[str,
     instead of resurrecting the last session.
     """
     base_path = resolve_base_path()
-    base_text = _read_text(base_path)
-    override_text = _read_text(config_path)
+    base_text = read_text(base_path)
+    override_text = read_text(config_path)
     session_values: Optional[Dict[str, object]] = None
     if not os.path.isfile(config_path) and base_path is None:
         session_values = load_session(config_path)

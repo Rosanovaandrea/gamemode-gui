@@ -1,40 +1,22 @@
-"""General core: orchestrates the sections and runs the app-wide operations.
-
-It holds the section cores (each the source of truth for its own choices) and
-does only three things:
-
-  1. orchestrate the sections: it joins their own rendered output into the
-     gamemode.ini content;
-  2. manage the file: atomic save, restore previous (``.bak``) and factory reset
-     (``.orig``), plus the JSON session sidecar;
-  3. manage the language choice.
-
-No option logic lives here: every section renders and reads itself.
-"""
+"""General core: orchestrates sections and runs app-wide file operations."""
 
 from __future__ import annotations
 
-import json
 import os
-import shutil
-import subprocess
-import sys
 import tempfile
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-import fileops, i18n
+from gamemode_gui import i18n
+from gamemode_gui.config import (
+    fileops, load_session, resolve_base_path, resolve_config_path, save_session,
+)
+from gamemode_gui.services import (
+    CommandResult, is_privileged_path, run_privileged,
+)
 
-
-# --- file management (atomic commit / rollback) ------------------------------
 
 class ConfigManager:
-    """Manage one gamemode.ini: atomic commit, backup and rollback.
-
-    Writing to ``/etc`` is delegated to the root helper via pkexec/sudo; a
-    writable path (tests, user configs) is handled in-process. Either way the
-    commit is atomic and has a rollback, via :mod:`fileops`.
-    """
+    """Manage one gamemode.ini: atomic commit, backup and rollback."""
 
     def __init__(self, config_path: str, orig_seed: str = "") -> None:
         self.config_path = config_path
@@ -56,7 +38,6 @@ class ConfigManager:
     def save(self, content: str) -> None:
         """Commit ``content`` to the managed file (privileged or local)."""
         if is_privileged_path(self.config_path):
-            # Privileged target (e.g. /etc): the write is done by the root helper.
             seed_file = self._write_seed_tmp()
             extra_args = [seed_file] if seed_file else []
             try:
@@ -127,73 +108,6 @@ class ConfigManager:
                 pass
 
 
-# --- configuration locations ------------------------------------------------
-
-def resolve_config_path() -> str:
-    """Path of the gamemode.ini managed by the GUI (``/etc`` or ``GAMEMODE_CONFIG``)."""
-    override = os.environ.get("GAMEMODE_CONFIG")
-    if override:
-        return override
-    return "/etc/gamemode.ini"
-
-
-def resolve_base_path() -> Optional[str]:
-    """Find the package-installed gamemode.ini, or ``None``."""
-    if "GAMEMODE_BASE" in os.environ:
-        value = os.environ.get("GAMEMODE_BASE", "").strip()
-        return value or None
-    xdg = os.environ.get("XDG_DATA_DIRS", "").strip()
-    data_dirs = [d for d in xdg.split(":") if d] if xdg else []
-    data_dirs += ["/usr/local/share", "/usr/share"]
-    for data_dir in data_dirs:
-        path = os.path.join(data_dir, "gamemode", "gamemode.ini")
-        if os.path.isfile(path):
-            return path
-    return None
-
-
-# --- JSON session persistence ------------------------------------------------
-
-def save_session(config_path: str, values: Dict[str, object]) -> None:
-    """Persist the current values to ``<config>.session.json`` (best effort)."""
-    categories: Dict[str, Dict[str, object]] = {}
-    for flat_key, value in values.items():
-        section, _, key = flat_key.partition(".")
-        categories.setdefault(section, {})[key] = value
-    data = {"version": 1, "categories": categories}
-    try:
-        # The session sidecar lives next to the config: <config>.session.json.
-        with open(config_path + ".session.json", "w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2)
-    except OSError:
-        pass
-
-
-def load_session(config_path: str) -> Optional[Dict[str, object]]:
-    """Load the flat ``section.key -> value`` mapping from the session JSON."""
-    try:
-        # The session sidecar lives next to the config: <config>.session.json.
-        with open(config_path + ".session.json", "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    categories = data.get("categories")
-    if isinstance(categories, dict):
-        flat: Dict[str, object] = {}
-        for section, options in categories.items():
-            if isinstance(options, dict):
-                for key, value in options.items():
-                    flat[f"{section}.{key}"] = value
-        return flat
-    if isinstance(data.get("values"), dict):
-        return data["values"]
-    return None
-
-
-# --- application core (orchestrator) -----------------------------------------
-
 class AppCore:
     """Orchestrates the sections and performs the app-wide operations."""
 
@@ -208,18 +122,14 @@ class AppCore:
     def render(self) -> str:
         """Join the sections' own output into the gamemode.ini content."""
         parts = [section.render_ini_section() for section in self.sections]
-        parts = [part for part in parts if part]
-        if not parts:
-            return ""
-        return "\n".join(parts)
+        return "\n".join(part for part in parts if part)
 
     def collect_values(self) -> Dict[str, object]:
-        """Flat ``section.key -> value`` mapping of every section (for the session)."""
-        values: Dict[str, object] = {}
-        for section in self.sections:
-            for spec in section.options:
-                values[f"{section.section_id}.{spec.key}"] = getattr(section.state, spec.key)
-        return values
+        """Flat ``section.key -> value`` mapping of every section."""
+        return {
+            f"{section.section_id}.{spec.key}": getattr(section.state, spec.key)
+            for section in self.sections for spec in section.options
+        }
 
     def save(self) -> None:
         """Commit the combined content atomically and persist the session."""
@@ -247,68 +157,3 @@ class AppCore:
     def choose_language(self, code: str) -> None:
         """Persist a new language choice (applied on the next start)."""
         i18n.save_lang(code)
-
-
-# --- privileged front-end (owned here: save/restore may need root) -----------
-
-@dataclass
-class CommandResult:
-    """Outcome of the privileged helper process."""
-
-    success: bool
-    returncode: int
-    stdout: str = ""
-    stderr: str = ""
-    error: str = ""
-    command: str = ""
-
-
-def _find_executable(name: str, *fallbacks: str) -> Optional[str]:
-    """Find an executable in PATH, then among the known absolute paths."""
-    path = shutil.which(name)
-    if path:
-        return path
-    for candidate in fallbacks:
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
-    return None
-
-
-def _privileged_prefixes() -> List[List[str]]:
-    """Available privileged prefixes, in order (pkexec, then sudo)."""
-    prefixes: List[List[str]] = []
-    pkexec = _find_executable("pkexec", "/usr/bin/pkexec", "/usr/sbin/pkexec")
-    if pkexec:
-        prefixes.append([pkexec])
-    sudo = _find_executable("sudo", "/usr/bin/sudo", "/bin/sudo", "/usr/sbin/sudo")
-    if sudo:
-        prefixes.append([sudo, "-n"])
-    return prefixes
-
-
-def run_privileged(command: str, path: str, content: str = "", timeout: int = 60,
-                   extra_args: Optional[List[str]] = None) -> CommandResult:
-    """Run a privileged operation, trying pkexec then sudo."""
-    # Command line: python <package>/privileged.py <command> <path> [extra args].
-    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privileged.py")
-    helper_argv = [sys.executable, helper, command, path] + list(extra_args or [])
-    for prefix in _privileged_prefixes():
-        try:
-            # Run the helper as root and capture its output.
-            process = subprocess.run(prefix + helper_argv, input=content,
-                                     capture_output=True, text=True,
-                                     timeout=timeout, check=False)
-            return CommandResult(process.returncode == 0, process.returncode,
-                                 process.stdout, process.stderr,
-                                 command=" ".join(prefix + helper_argv))
-        except FileNotFoundError:
-            continue
-        except subprocess.SubprocessError:
-            continue
-    raise FileNotFoundError("no privileged frontend available (pkexec/sudo)")
-
-
-def is_privileged_path(path: str) -> bool:
-    """True if the destination directory is not writable by the user (e.g. /etc)."""
-    directory = os.path.dirname(path) or "/"
-    return not os.access(directory, os.W_OK)
