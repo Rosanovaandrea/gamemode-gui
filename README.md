@@ -93,9 +93,9 @@ Some options (especially the GPU/iGPU ones) may not be supported or may not work
 - Feral GameMode (the daemon the GUI configures)
 - `pkexec` (polkit) or `sudo` for the privileged writes to `/etc`
 
-Redux (`redux-py`) and Rx are vendored under `vendor/`, so no pip
-install is required. GNU gettext (`msgfmt`) is only needed to rebuild the `.mo`
-catalogs after editing a `.po` file.
+Redux is not required: the application store is a small internal class. GNU
+gettext (`msgfmt`) is only needed to rebuild the `.mo` catalogs after editing a
+`.po` file.
 
 ```bash
 # Fedora / RHEL
@@ -124,7 +124,7 @@ GAMEMODE_CONFIG=/tmp/try/gamemode.ini python3 main.py
 python3 test/sections/run_all.py  # per-section integration tests, no display
 python3 test/test_engine.py       # engine, no display
 python3 test/test_app.py          # application (bootstrap / save / restore), no display
-python3 test/test_state.py        # Redux store, no display
+python3 test/test_state.py        # application store, no display
 python3 test/smoke_test.py        # interface (needs DISPLAY), uses a temporary folder
 ```
 

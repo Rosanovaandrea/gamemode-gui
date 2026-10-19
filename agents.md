@@ -13,12 +13,11 @@ testable libraries:
 | Package | Responsibility |
 | --- | --- |
 | `i18n` | gettext catalogs, language detection and `settings.json` |
-| `state` | Redux actions/reducers/store and selectors |
+| `state` | application store, change notifications and dirty flag |
 | `configuration.py` | paths, INI slices, session, atomic copy-on-write |
 | `services` | commands, pkexec/sudo, daemon actions, root helper |
 | `sections` | the self-contained `gamemode.ini` sections |
 | `ui` | window, pages and the reusable widget library |
-| `vendor` | vendored `redux-py` + `Rx` (MIT) |
 
 The top-level modules (`core.py`, `initializer.py`, `configuration.py`, `spec.py`,
 `main.py`) are the entry points; new code imports the libraries above directly.
@@ -30,13 +29,13 @@ Each stateful section declares `section_id` and `options` and extends
 `AppStore`:
 
 - speaking `get_<key>()` / `set_<key>()` accessors stay available;
-- setters dispatch `SET_OPTION`; the store notifies subscribers;
+- setters call `AppStore.set_option()`; the store notifies subscribers;
 - `render_ini_section()` and `apply_parsed_section()` remain section-specific.
 
-The store holds `{sections: {id: values}, dirty: bool}`. Reducers are pure;
-`Configuration` owns reading and writing the file. `initializer.build_app()`
-creates one store, builds every section and calls `Configuration.load()`; `save()`
-asks `Configuration.save()` to render all sections and commit atomically.
+The store holds `{sections: {id: values}, dirty: bool}`. `Configuration` owns
+reading and writing the file. `initializer.build_app()` creates one store, builds
+every section and calls `Configuration.load()`; `save()` asks
+`Configuration.save()` to render all sections and commit atomically.
 
 ## i18n
 
@@ -66,10 +65,9 @@ gamemode-gui/
 ├── configuration.py           read/write gamemode.ini atomically
 ├── services/                  commands, privileged, daemon, helper
 ├── i18n/                      gettext + settings
-├── state/                     Redux store
+├── state/                     application store
 ├── sections/                  one folder per section
 ├── ui/                        window + pages/ + widgets/
-├── vendor/                    vendored Redux/Rx
 ├── data/                      style.css, locale/*.po, *.mo, languages.json
 ├── scripts/locales.py         compile/check catalogs
 └── test/                      headless tests + smoke test
@@ -98,7 +96,7 @@ python3 test/smoke_test.py         # real window (needs DISPLAY)
 
 `packaging/build.sh` builds the `.deb` and `.rpm` into `dist/` (pure Python/GTK).
 It installs `main.py`, the top-level modules and the internal libraries, including
-the compiled `.mo` catalogs and the vendored Redux libraries. CI
+the compiled `.mo` catalogs. CI
 (`.github/workflows/build-packages.yml`) runs the headless tests before building.
 
 ## Caveats

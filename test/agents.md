@@ -21,7 +21,7 @@ test framework), so the same command works locally and in CI.
 - `test_engine.py` — each section's options and INI (de)serialisation, i18n and the
   privileged helper.
 - `test_app.py` — bootstrap, atomic save, `.orig`/`.bak`, restore and reload.
-- `test_state.py` — Redux actions/reducers/store, subscriptions and dirty flag.
+- `test_state.py` — application store, subscriptions and dirty flag.
 - `smoke_test.py` — builds the real GTK window (needs a display).
 
 ## Run
@@ -30,7 +30,7 @@ test framework), so the same command works locally and in CI.
 python3 test/sections/run_all.py   # per-section integration tests
 python3 test/test_engine.py        # engine
 python3 test/test_app.py           # application
-python3 test/test_state.py         # Redux store
+python3 test/test_state.py         # application store
 python3 test/smoke_test.py         # interface (needs DISPLAY)
 ```
 

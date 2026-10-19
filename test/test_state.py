@@ -1,4 +1,4 @@
-"""State tests (no GUI): actions, reducers, selectors and dirty tracking."""
+"""State tests (no GUI): section values, notifications and dirty tracking."""
 
 import os
 import sys
@@ -6,9 +6,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from state.store import AppStore, section_defaults  # noqa: E402
-from state.actions import (  # noqa: E402
-    load_action, option_action, reset_section,
-)
 
 defaults = {"demo": section_defaults([
     type("Spec", (), {"key": "value", "default": 1})(),
@@ -21,15 +18,15 @@ assert not store.is_dirty()
 
 events = []
 store.subscribe(lambda root: events.append(root["sections"]["demo"]))
-store.dispatch(option_action("demo", "value", 7))
+store.set_option("demo", "value", 7)
 assert store.section_state("demo")["value"] == 7
 assert events[-1]["value"] == 7
 assert store.is_dirty()
 
-store.dispatch(load_action("demo", {"items": ["b"]}, append=True))
+store.load_section("demo", {"items": ["b"]}, append=True)
 assert store.section_state("demo")["items"] == ["a", "b"]
 
-store.dispatch(reset_section("demo"))
+store.reset_section("demo")
 assert store.section_state("demo") == {"value": 1, "items": ["a"]}
 
 store.set_dirty(False)

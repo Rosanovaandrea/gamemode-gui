@@ -24,8 +24,7 @@ py-modules = ["main", "core", "initializer", "spec", "configuration"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["data*", "i18n*", "sections*", "services*", "state*", "ui*", "vendor*"]
+include = ["data*", "i18n*", "sections*", "services*", "state*", "ui*"]
 
 [tool.setuptools.package-data]
 data = ["style.css", "locale/*.po", "locale/*.json", "locale/*/LC_MESSAGES/*.mo"]
-vendor = ["LICENSES/*"]

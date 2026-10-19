@@ -1,6 +1,6 @@
 """Shared base for the stateful section cores.
 
-The state now lives in a single Redux store. ``SectionCore`` is a thin facade:
+The state now lives in a single application store. ``SectionCore`` is a thin facade:
 it installs speaking getters/setters, reads selectors and forwards changes to
 the existing view listeners, so the section APIs stay unchanged.
 """
@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from state.store import AppStore, section_defaults
-from state.actions import load_action, option_action, reset_section
 from configuration import extract_section
 from spec import OptionSpec
 
@@ -69,7 +68,7 @@ class SectionCore:
         return self.store.section_state(self.section_id).get(option_key)
 
     def _set_option(self, option_key: str, value) -> None:
-        self.store.dispatch(option_action(self.section_id, option_key, value))
+        self.store.set_option(self.section_id, option_key, value)
 
     # -- allowed values ------------------------------------------------------
     def allowed_values_for(self, option: OptionSpec) -> List[str]:
@@ -101,7 +100,7 @@ class SectionCore:
 
     def reset_to_defaults(self) -> None:
         """Reset every option of this section to its default value."""
-        self.store.dispatch(reset_section(self.section_id))
+        self.store.reset_section(self.section_id)
 
     def apply_saved_values(self, saved_values: Dict[str, object]) -> None:
         """Set typed saved-session values for this section."""
@@ -111,4 +110,4 @@ class SectionCore:
             if flat_key in saved_values:
                 selected[option.key] = saved_values[flat_key]
         if selected:
-            self.store.dispatch(load_action(self.section_id, selected))
+            self.store.load_section(self.section_id, selected)

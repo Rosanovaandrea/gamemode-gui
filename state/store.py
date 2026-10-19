@@ -1,16 +1,9 @@
-"""Application store: a small, immutable Redux layer over the vendored redux-py."""
+"""Small application store: a dict of section values plus a dirty flag."""
 
 from __future__ import annotations
 
 import copy
 from typing import Callable, Dict, Iterable, Optional
-
-from .actions import ActionType, dirty_action, init_action
-from .vendor import create_feature_module, create_store
-
-
-def _initial_state() -> dict:
-    return {"sections": {}, "dirty": False}
 
 
 def _deep(value):
@@ -18,95 +11,81 @@ def _deep(value):
 
 
 class AppStore:
-    """Store for all section values plus the window dirty flag.
-
-    Reducers are pure and return new mappings. Views subscribe with a callback;
-    the callbacks receive the whole root state (``sections`` + ``dirty``).
-    """
+    """Owns the section values and notifies subscribers after each change."""
 
     def __init__(self, defaults: Optional[Dict[str, dict]] = None) -> None:
         self._defaults: Dict[str, dict] = _deep(defaults or {})
-        self._state = _initial_state()
+        self._sections: Dict[str, dict] = _deep(defaults or {})
+        self._dirty = False
         self._listeners: list[Callable[[dict], None]] = []
-        self._store = create_store()
-        self._store.add_feature_module(create_feature_module("app", self._reduce))
-        self._store.as_observable().subscribe(self._received)
-        for section_id, values in self._defaults.items():
-            self.ensure_section(section_id, values)
 
-    # -- reducers ------------------------------------------------------------
-    def _reduce(self, state: Optional[dict], action) -> dict:
-        state = _deep(state) if state else _initial_state()
-        sections = state["sections"]
-        action_type = getattr(action, "type", "")
-        match action_type:
-            case ActionType.INIT_SECTION:
-                section_id, values = action.payload
-                sections[section_id] = {
-                    **_deep(self._defaults.get(section_id, {})),
-                    **_deep(values),
-                    **sections.get(section_id, {}),
-                }
-            case ActionType.SET_OPTION:
-                section_id, key, value = action.payload
-                values = dict(sections.get(section_id, self._defaults.get(section_id, {})))
-                values[key] = _deep(value)
-                sections[section_id] = values
-                state["dirty"] = True
-            case ActionType.LOAD_SECTION:
-                section_id, values, append = action.payload
-                current = dict(sections.get(section_id, self._defaults.get(section_id, {})))
-                for key, value in values.items():
-                    current[key] = self._merged_value(current.get(key), value, append)
-                sections[section_id] = current
-                state["dirty"] = True
-            case ActionType.RESET_SECTION:
-                section_id = action.payload
-                sections[section_id] = _deep(self._defaults.get(section_id, {}))
-                state["dirty"] = True
-            case ActionType.SET_DIRTY:
-                state["dirty"] = bool(action.payload)
-        return state
-
-    @staticmethod
-    def _merged_value(previous, value, append: bool):
-        """Replace a value, or append to it when both sides are lists."""
-        if append and isinstance(previous, list) and isinstance(value, list):
-            return [*previous, *_deep(value)]
-        return _deep(value)
-
-    # -- store API -----------------------------------------------------------
-    def _received(self, root: dict) -> None:
-        self._state = root.get("app", _initial_state())
-        for listener in list(self._listeners):
-            listener(self._state)
-
-    def dispatch(self, action) -> None:
-        self._store.dispatch(action)
-
+    # -- section lifecycle ---------------------------------------------------
     def ensure_section(self, section_id: str, defaults: Dict[str, object]) -> None:
-        """Register a section and its defaults (idempotent)."""
+        """Register a section and fill any missing default values."""
         self._defaults.setdefault(section_id, _deep(defaults))
-        self.dispatch(init_action(section_id, defaults))
+        values = self._sections.setdefault(section_id, {})
+        for key, value in defaults.items():
+            values.setdefault(key, _deep(value))
+        self._notify()
 
     def section_state(self, section_id: str) -> dict:
         """Current values of one section (a copy)."""
-        return _deep(self._state["sections"].get(section_id, self._defaults.get(section_id, {})))
+        return _deep(self._sections.get(
+            section_id, self._defaults.get(section_id, {})))
 
     def get_state(self) -> dict:
-        """Current root state (a copy)."""
-        return _deep(self._state)
+        """Whole state, as consumed by the window."""
+        return {"sections": _deep(self._sections), "dirty": self._dirty}
+
+    # -- mutations -----------------------------------------------------------
+    def set_option(self, section_id: str, key: str, value) -> None:
+        """Set one option and notify subscribers."""
+        values = self._sections.setdefault(
+            section_id, _deep(self._defaults.get(section_id, {})))
+        values[key] = _deep(value)
+        self._dirty = True
+        self._notify()
+
+    def load_section(self, section_id: str, values: Dict[str, object],
+                     append: bool = False) -> None:
+        """Load several typed values; lists can be appended instead of replaced."""
+        current = self._sections.setdefault(
+            section_id, _deep(self._defaults.get(section_id, {})))
+        for key, value in values.items():
+            if append and isinstance(current.get(key), list) and isinstance(value, list):
+                current[key] = [*current[key], *_deep(value)]
+            else:
+                current[key] = _deep(value)
+        self._dirty = True
+        self._notify()
+
+    def reset_section(self, section_id: str) -> None:
+        """Restore one section to its defaults."""
+        self._sections[section_id] = _deep(self._defaults.get(section_id, {}))
+        self._dirty = True
+        self._notify()
 
     def set_dirty(self, value: bool) -> None:
-        self.dispatch(dirty_action(value))
+        """Set the dirty flag and notify only when it changes."""
+        value = bool(value)
+        if value == self._dirty:
+            return
+        self._dirty = value
+        self._notify()
 
     def is_dirty(self) -> bool:
-        return bool(self._state.get("dirty", False))
+        return self._dirty
 
+    # -- subscription --------------------------------------------------------
     def subscribe(self, listener: Callable[[dict], None]) -> None:
         """Register a callback and immediately send the current state."""
         self._listeners.append(listener)
-        listener(self._state)
+        listener(self.get_state())
+
+    def _notify(self) -> None:
+        state = self.get_state()
+        for listener in list(self._listeners):
+            listener(state)
 
 
 def section_defaults(options: Iterable) -> dict:

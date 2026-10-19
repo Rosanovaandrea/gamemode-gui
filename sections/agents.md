@@ -7,7 +7,7 @@ The app is a set of independent **sections**, one folder each under
 
 - `core.py` — `SectionState` (attribute view over the store) and `SectionCore`,
   the base every **stateful** core extends. It registers the section defaults in
-  the shared Redux store, installs a speaking `get_<key>`/`set_<key>` per option
+  the shared application store, installs a speaking `get_<key>`/`set_<key>` per option
   and loads the section with `load_texts()`. A subclass sets `section_id` +
   `options` and implements `render_ini_section()`, `apply_parsed_section()` and
   `is_option_active()`; `allowed_values_for()` is only overridden when the allowed

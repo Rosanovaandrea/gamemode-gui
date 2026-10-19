@@ -1,1 +1,1 @@
-"""Redux state package."""
+"""Application state package."""
