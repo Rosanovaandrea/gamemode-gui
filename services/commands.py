@@ -24,14 +24,8 @@ class CommandResult:
 
     @property
     def output(self) -> str:
-        parts: List[str] = []
-        if self.stdout:
-            parts.append(self.stdout.rstrip())
-        if self.stderr:
-            parts.append(self.stderr.rstrip())
-        if self.error:
-            parts.append(self.error)
-        return "\n".join(parts)
+        streams = (self.stdout.rstrip(), self.stderr.rstrip(), self.error)
+        return "\n".join(stream for stream in streams if stream)
 
 
 def find_executable(name: str, *fallbacks: str) -> Optional[str]:

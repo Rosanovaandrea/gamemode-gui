@@ -39,9 +39,7 @@ def _catalog(path: str) -> tuple[dict[str, str], str, str]:
 
 def convert(xml_dir: str = DEFAULT_LOCALE, po_dir: str = DEFAULT_LOCALE) -> None:
     names = {}
-    for name in sorted(os.listdir(xml_dir)):
-        if not name.endswith(".xml"):
-            continue
+    for name in (n for n in sorted(os.listdir(xml_dir)) if n.endswith(".xml")):
         code = name[:-4]
         entries, label, _ = _catalog(os.path.join(xml_dir, name))
         names[code] = label or code.upper()
@@ -73,9 +71,7 @@ def _mo_path(locale_dir: str, code: str) -> str:
 
 
 def compile_catalogs(locale_dir: str = DEFAULT_LOCALE) -> None:
-    for name in sorted(os.listdir(locale_dir)):
-        if not name.endswith(".po"):
-            continue
+    for name in (n for n in sorted(os.listdir(locale_dir)) if n.endswith(".po")):
         code = name[:-3]
         target = _mo_path(locale_dir, code)
         os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -85,9 +81,7 @@ def compile_catalogs(locale_dir: str = DEFAULT_LOCALE) -> None:
 
 def check(locale_dir: str = DEFAULT_LOCALE) -> int:
     failed = 0
-    for name in sorted(os.listdir(locale_dir)):
-        if not name.endswith(".po"):
-            continue
+    for name in (n for n in sorted(os.listdir(locale_dir)) if n.endswith(".po")):
         code = name[:-3]
         source = os.path.join(locale_dir, name)
         target = _mo_path(locale_dir, code)

@@ -12,21 +12,19 @@ def extract_section(text: str, section_id: str) -> Dict[str, List[str]]:
     current_key = None
     for raw_line in text.splitlines():
         line = raw_line.strip()
-        if not line or line.startswith(";") or line.startswith("#"):
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            section = line[1:-1].strip()
-            current_key = None
-            continue
-        if section != section_id:
-            continue
-        if "=" in line or ":" in line:
-            separator = "=" if "=" in line else ":"
-            name, _, value = line.partition(separator)
-            current_key = name.strip()
-            result.setdefault(current_key, []).append(strip_comment(value.strip()))
-        elif current_key is not None:
-            result.setdefault(current_key, []).append(strip_comment(line))
+        match line:
+            case _ if not line or line.startswith((";", "#")):
+                continue
+            case _ if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1].strip()
+                current_key = None
+            case _ if section == section_id and ("=" in line or ":" in line):
+                separator = "=" if "=" in line else ":"
+                name, _, value = line.partition(separator)
+                current_key = name.strip()
+                result.setdefault(current_key, []).append(strip_comment(value.strip()))
+            case _ if section == section_id and current_key is not None:
+                result.setdefault(current_key, []).append(strip_comment(line))
     return result
 
 

@@ -104,17 +104,16 @@ class CustomCore(SectionCore):
         """Apply parsed values; ``append`` extends the script lists."""
         for option_spec in self.options:
             raw_values = parsed_section.get(option_spec.key)
-            if not raw_values:
-                continue
-            match option_spec.type:
-                case "list":
-                    self._apply_list(option_spec, raw_values, append)
-                case "toggle_entry":
-                    self._set_option(option_spec.key, True)
-                case "int":
-                    self._apply_int(option_spec, raw_values)
-                case _:
-                    self._set_option(option_spec.key, raw_values[-1])
+            if raw_values:
+                match option_spec.type:
+                    case "list":
+                        self._apply_list(option_spec, raw_values, append)
+                    case "toggle_entry":
+                        self._set_option(option_spec.key, True)
+                    case "int":
+                        self._apply_int(option_spec, raw_values)
+                    case _:
+                        self._set_option(option_spec.key, raw_values[-1])
         self._extract_toggle_entries_from_lists()
 
     def _apply_list(self, option_spec: OptionSpec, raw_values: List[str],
@@ -136,16 +135,16 @@ class CustomCore(SectionCore):
     def _extract_toggle_entries_from_lists(self) -> None:
         """Turn a managed string found in a list into its switch and drop it."""
         for toggle_spec in self.options:
-            if toggle_spec.type != "toggle_entry":
-                continue
-            if not toggle_spec.target or not toggle_spec.entry:
-                continue
-            list_spec = self._option(toggle_spec.target)
-            if list_spec is None or list_spec.type != "list":
-                continue
-            items = getattr(self.state, list_spec.key)
-            if toggle_spec.entry not in items:
-                continue
-            self._set_option(toggle_spec.key, True)
-            self._set_option(list_spec.key,
-                             [item for item in items if item != toggle_spec.entry])
+            target_spec = self._option(toggle_spec.target) if toggle_spec.target else None
+            target_items = (
+                getattr(self.state, target_spec.key)
+                if target_spec is not None and target_spec.type == "list"
+                else []
+            )
+            if (toggle_spec.type == "toggle_entry"
+                    and toggle_spec.entry
+                    and toggle_spec.entry in target_items):
+                self._set_option(toggle_spec.key, True)
+                self._set_option(target_spec.key,
+                                 [item for item in target_items
+                                  if item != toggle_spec.entry])

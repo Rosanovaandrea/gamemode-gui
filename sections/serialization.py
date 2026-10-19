@@ -61,10 +61,9 @@ def render_section(core, written: Written = written_default,
     """Render the active options of ``core`` as an INI section."""
     lines: List[str] = []
     for option_spec in core.options:
-        if gate_dependencies and not core.dependency_active(option_spec):
-            continue
         value = getattr(core.state, option_spec.key)
-        if not written(option_spec, value):
+        if ((gate_dependencies and not core.dependency_active(option_spec))
+                or not written(option_spec, value)):
             continue
         if option_spec.comment:
             lines.append(option_spec.comment)
@@ -108,9 +107,7 @@ def parse_into(core, parsed: Dict[str, List[str]], append: bool = False) -> None
     """Apply parsed values to ``core`` (lists optionally extend the current one)."""
     for option_spec in core.options:
         values = parsed.get(option_spec.key)
-        if not values:
-            continue
-        value = parse_value(option_spec, values)
+        value = parse_value(option_spec, values) if values else None
         if value is None:
             continue
         if append:

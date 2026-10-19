@@ -94,8 +94,8 @@ class SectionPage(Gtk.Box):
 
     def refresh_gating(self) -> None:
         for row in self.rows:
-            if not row.spec.depends_on:
-                continue
-            dependency = next((spec for spec in self.core.options
-                               if spec.key == row.spec.depends_on), None)
-            row.set_enabled(self.core.is_option_active(dependency) if dependency else True)
+            if row.spec.depends_on:
+                dependency = next((spec for spec in self.core.options
+                                   if spec.key == row.spec.depends_on), None)
+                row.set_enabled(self.core.is_option_active(dependency)
+                                if dependency else True)

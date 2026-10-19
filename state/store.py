@@ -6,8 +6,8 @@ import copy
 from typing import Callable, Dict, Iterable, Optional
 
 from .actions import (
-    INIT_SECTION, LOAD_SECTION, RESET_SECTION, SET_DIRTY, SET_OPTION,
-    dirty_action, init_action,
+    ActionType, INIT_SECTION, LOAD_SECTION, RESET_SECTION, SET_DIRTY,
+    SET_OPTION, dirty_action, init_action,
 )
 from .vendor import create_feature_module, create_store
 
@@ -43,31 +43,31 @@ class AppStore:
         sections = state["sections"]
         action_type = getattr(action, "type", "")
         match action_type:
-            case _ if action_type == INIT_SECTION:
+            case ActionType.INIT_SECTION:
                 section_id, values = action.payload
                 sections[section_id] = {
                     **_deep(self._defaults.get(section_id, {})),
                     **_deep(values),
                     **sections.get(section_id, {}),
                 }
-            case _ if action_type == SET_OPTION:
+            case ActionType.SET_OPTION:
                 section_id, key, value = action.payload
                 values = dict(sections.get(section_id, self._defaults.get(section_id, {})))
                 values[key] = _deep(value)
                 sections[section_id] = values
                 state["dirty"] = True
-            case _ if action_type == LOAD_SECTION:
+            case ActionType.LOAD_SECTION:
                 section_id, values, append = action.payload
                 current = dict(sections.get(section_id, self._defaults.get(section_id, {})))
                 for key, value in values.items():
                     current[key] = self._merged_value(current.get(key), value, append)
                 sections[section_id] = current
                 state["dirty"] = True
-            case _ if action_type == RESET_SECTION:
+            case ActionType.RESET_SECTION:
                 section_id = action.payload
                 sections[section_id] = _deep(self._defaults.get(section_id, {}))
                 state["dirty"] = True
-            case _ if action_type == SET_DIRTY:
+            case ActionType.SET_DIRTY:
                 state["dirty"] = bool(action.payload)
         return state
 

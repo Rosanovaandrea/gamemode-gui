@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from enum import Enum
+from typing import Any
 
 from .vendor import create_action
 
-SET_OPTION = "SET_OPTION"
-LOAD_SECTION = "LOAD_SECTION"
-RESET_SECTION = "RESET_SECTION"
-INIT_SECTION = "INIT_SECTION"
-SET_DIRTY = "SET_DIRTY"
+
+class ActionType(str, Enum):
+    """Every action type accepted by the store."""
+
+    SET_OPTION = "SET_OPTION"
+    LOAD_SECTION = "LOAD_SECTION"
+    RESET_SECTION = "RESET_SECTION"
+    INIT_SECTION = "INIT_SECTION"
+    SET_DIRTY = "SET_DIRTY"
+
+
+SET_OPTION = ActionType.SET_OPTION
+LOAD_SECTION = ActionType.LOAD_SECTION
+RESET_SECTION = ActionType.RESET_SECTION
+INIT_SECTION = ActionType.INIT_SECTION
+SET_DIRTY = ActionType.SET_DIRTY
 
 set_option = create_action(SET_OPTION)
 load_section = create_action(LOAD_SECTION)

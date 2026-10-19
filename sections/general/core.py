@@ -27,7 +27,7 @@ def available_governors() -> List[str]:
                     if governor not in governors:
                         governors.append(governor)
         except OSError:
-            continue
+            pass
     return governors or list(_FALLBACK_GOVERNORS)
 
 
