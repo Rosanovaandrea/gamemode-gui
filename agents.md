@@ -30,7 +30,7 @@ Each stateful section declares `section_id` and `options` and extends
 
 - speaking `get_<key>()` / `set_<key>()` accessors stay available;
 - setters call `AppStore.set_option()`; the store notifies subscribers;
-- `render_ini_section()` and `apply_parsed_section()` remain section-specific.
+- default `render_ini_section()`, `apply_parsed_section()` and `is_option_active()` live in `SectionCore`; only rules that differ are overridden (the custom section).
 
 The store holds `{sections: {id: values}, dirty: bool}`. `Configuration` owns
 reading and writing the file. `initializer.build_app()` creates one store, builds

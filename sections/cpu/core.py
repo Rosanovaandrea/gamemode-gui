@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List
+from typing import List
 
 from sections.core import SectionCore
 from sections.cpu.options import CPU_OPTIONS
 from sections.serialization import (
-    cpu_value, expand_cpu_list, parse_into, render_section, written_nonempty,
+    cpu_value, expand_cpu_list, written_nonempty,
 )
 from spec import OptionSpec
 
@@ -33,17 +33,10 @@ class CpuCore(SectionCore):
 
     section_id = SECTION_ID
     options = CPU_OPTIONS
+    written_rule = staticmethod(written_nonempty)
+    render_value = staticmethod(cpu_value)
 
     def allowed_values_for(self, option: OptionSpec) -> List[str]:
         if option.special and option.special_source == "cpu_cores":
             return available_cores()
         return list(option.choices or [])
-
-    def is_option_active(self, option: OptionSpec) -> bool:
-        return written_nonempty(option, getattr(self.state, option.key))
-
-    def render_ini_section(self) -> str:
-        return render_section(self, written=written_nonempty, render_value=cpu_value)
-
-    def apply_parsed_section(self, parsed_section: Dict[str, List[str]]) -> None:
-        parse_into(self, parsed_section)

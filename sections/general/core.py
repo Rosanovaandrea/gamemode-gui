@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import glob
-from typing import Dict, List
+from typing import List
 
 from sections.core import SectionCore
 from sections.general.options import GENERAL_OPTIONS
-from sections.serialization import (
-    bool_value, parse_into, render_section, written_default,
-)
+from sections.serialization import bool_value
 from spec import OptionSpec
 
 SECTION_ID = "general"
@@ -36,17 +34,9 @@ class GeneralCore(SectionCore):
 
     section_id = SECTION_ID
     options = GENERAL_OPTIONS
+    render_value = staticmethod(bool_value)
 
     def allowed_values_for(self, option: OptionSpec) -> List[str]:
         if option.special and option.special_source == "cpu_governors":
             return available_governors()
         return list(option.choices or [])
-
-    def render_ini_section(self) -> str:
-        return render_section(self, written=written_default, render_value=bool_value)
-
-    def is_option_active(self, option: OptionSpec) -> bool:
-        return written_default(option, getattr(self.state, option.key))
-
-    def apply_parsed_section(self, parsed_section: Dict[str, List[str]]) -> None:
-        parse_into(self, parsed_section)

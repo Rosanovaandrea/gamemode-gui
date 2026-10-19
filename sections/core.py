@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 
 from state.store import AppStore, section_defaults
 from configuration import extract_section
+from sections.serialization import parse_into, render_section, written_default
 from spec import OptionSpec
 
 
@@ -40,6 +41,9 @@ class SectionCore:
     section_id = ""
     options: List[OptionSpec] = []
     append_on_load = False
+    gate_dependencies = False
+    written_rule = staticmethod(written_default)
+    render_value = None
 
     def __init__(self, store: Optional[AppStore] = None) -> None:
         """Register the section defaults and install the option accessors."""
@@ -82,6 +86,21 @@ class SectionCore:
         dependency = next((candidate for candidate in self.options
                            if candidate.key == option.depends_on), None)
         return self.is_option_active(dependency) if dependency else True
+
+    # -- rendering / parsing (common defaults) -------------------------------
+    def is_option_active(self, option: OptionSpec) -> bool:
+        """True when the option contributes a line to the section."""
+        return self.written_rule(option, getattr(self.state, option.key))
+
+    def render_ini_section(self) -> str:
+        """Render the active options using this section's write rule."""
+        return render_section(self, written=self.written_rule,
+                              render_value=self.render_value,
+                              gate_dependencies=self.gate_dependencies)
+
+    def apply_parsed_section(self, parsed_section: Dict[str, List[str]]) -> None:
+        """Apply parsed values with the shared typed parser."""
+        parse_into(self, parsed_section)
 
     # -- state ---------------------------------------------------------------
     def load_texts(self, base_text: str, override_text: str,

@@ -7,13 +7,14 @@ The app is a set of independent **sections**, one folder each under
 
 - `core.py` — `SectionState` (attribute view over the store) and `SectionCore`,
   the base every **stateful** core extends. It registers the section defaults in
-  the shared application store, installs a speaking `get_<key>`/`set_<key>` per option
-  and loads the section with `load_texts()`. A subclass sets `section_id` +
-  `options` and implements `render_ini_section()`, `apply_parsed_section()` and
-  `is_option_active()`; `allowed_values_for()` is only overridden when the allowed
-  values come from the kernel. `load_texts()` resets the core, applies the base
-  and override slices (custom appends its lists) and uses the saved session only
-  when neither text had the section.
+  the shared application store, installs a speaking `get_<key>`/`set_<key>` per
+  option and loads the section with `load_texts()`. `SectionCore` also provides
+  the default `render_ini_section()`, `apply_parsed_section()` and
+  `is_option_active()` using `serialization.py`; a subclass only overrides them
+  when its rules differ (the custom section does). `allowed_values_for()` is
+  overridden only when the allowed values come from the kernel. `load_texts()`
+  resets the core, applies the base and override slices (custom appends its lists)
+  and uses the saved session only when neither text had the section.
 - `serialization.py` — generic INI rendering/parsing (`render_section`,
   `parse_into`, per-type codecs) used by the general/GPU/CPU cores. The custom
   section keeps its toggle/list rules.
