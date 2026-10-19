@@ -7,7 +7,7 @@ a missing binary and a timeout, none of which must raise.
 import _testkit
 _testkit.isolate()
 
-from sections.daemon.core import (  # noqa: E402
+from services.commands import (  # noqa: E402
     CommandResult, find_executable, privileged_prefixes, run_command,
 )
 

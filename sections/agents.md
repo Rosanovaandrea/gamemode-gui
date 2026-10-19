@@ -1,37 +1,37 @@
 # Sections
 
-The app is a set of independent **sections**, one folder each (a Python package;
-the `__init__.py` files are empty). The general window shows one page per section.
+The app is a set of independent **sections**, one folder each under
+`sections/` (a Python package). The general window shows one page per section.
 
 ## Shared files (package root)
 
-- `core.py` — `SectionState` (a section's values, one attribute per option) and
-  `SectionCore`, the base every **stateful** core extends. It builds the state,
-  installs a speaking `get_<key>`/`set_<key>` per option with change notification
-  (`subscribe_change_listener`), and provides `reset_to_defaults()` and
-  `apply_saved_values()`. A subclass sets `section_id` + `options` and implements
-  `render_ini_section()`, `apply_parsed_section()` and `is_option_active()`;
-  `allowed_values_for()` is only overridden when the allowed values come from the
-  kernel.
-- `initializer.py` — the shared loading logic. `extract_section()` parses one
-  `[section]` slice out of INI text; `load_section()` resets the core, applies the
-  installed base and the `/etc` override (custom appends its lists) and falls back
-  to the saved session only when neither text had the section.
+- `core.py` — `SectionState` (attribute view over the store) and `SectionCore`,
+  the base every **stateful** core extends. It registers the section defaults in
+  the shared application store, installs a speaking `get_<key>`/`set_<key>` per option
+  and loads the section with `load_texts()`. A subclass sets `section_id` +
+  `options` and implements `render_ini_section()`, `apply_parsed_section()` and
+  `is_option_active()`; `allowed_values_for()` is only overridden when the allowed
+  values come from the kernel. `load_texts()` resets the core, applies the base
+  and override slices (custom appends its lists) and uses the saved session only
+  when neither text had the section.
+- `serialization.py` — generic INI rendering/parsing (`render_section`,
+  `parse_into`, per-type codecs) used by the general/GPU/CPU cores. The custom
+  section keeps its toggle/list rules.
 
 ## Sections
 
 | Folder | INI block | Files |
 | --- | --- | --- |
-| `general/` | `[general]` | options + core + ui + initializer |
-| `gpu/` | `[gpu]` | options + core + ui + initializer |
-| `cpu/` | `[cpu]` | options + core + ui + initializer |
-| `custom/` | `[custom]` | options + core + ui + initializer |
+| `general/` | `[general]` | options + core + ui |
+| `gpu/` | `[gpu]` | options + core + ui |
+| `cpu/` | `[cpu]` | options + core + ui |
+| `custom/` | `[custom]` | options + core + ui |
 | `presentation/` | — (view only) | core + ui + `presentation.json` |
-| `daemon/` | — (utilities) | core + ui |
+| `daemon/` | — (utilities) | ui (+ `services/`) |
 
-- **Stateful** sections split their code into `options.py` (the option
-  descriptors), `core.py` (the section-specific render/read rules), `ui.py` (the
-  page) and `initializer.py` (the loading entry point).
+- **Stateful** sections split their code into `options.py` (option descriptors),
+  `core.py` (state/render/read rules) and `ui.py` (the page, usually a small
+  `SectionPage` configuration). Loading is handled by `SectionCore.load_texts()`.
 - **Stateless** sections only have `core.py` + `ui.py`.
 
 Each folder has its own `agents.md` with the details.

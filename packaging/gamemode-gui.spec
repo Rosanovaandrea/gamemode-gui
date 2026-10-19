@@ -38,9 +38,9 @@ pinning/parking and GPU optimisations.
 %install
 rm -rf %{buildroot}
 install -d %{buildroot}%{_datadir}/%{name}
-install -m 644 core.py ui.py initializer.py spec.py i18n.py fileops.py privileged.py widgets.py %{buildroot}%{_datadir}/%{name}/
-install -m 755 main.py %{buildroot}%{_datadir}/%{name}/main.py
-cp -r sections data %{buildroot}%{_datadir}/%{name}/
+install -m 644 core.py initializer.py spec.py configuration.py %{buildroot}%{_datadir}/%{name}/
+install -m 755 main.py %{buildroot}%{_datadir}/%{name}/
+cp -r data i18n sections services state ui %{buildroot}%{_datadir}/%{name}/
 find %{buildroot}%{_datadir}/%{name} -name '__pycache__' -type d -prune -exec rm -rf {} +
 
 install -d %{buildroot}%{_bindir}

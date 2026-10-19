@@ -20,13 +20,18 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-import i18n, initializer
-from i18n import tr
-from initializer import App, SECTION_MODULES
-from sections.daemon import core as daemon
+from i18n.settings import describe_lang_errors, ensure_settings, save_lang
+from i18n.translator import current_lang, tr
+from initializer import App, build_app, reload
+from services.daemon import (
+    GROUP_COMMAND, RESTART_COMMAND, TEST_COMMAND, VERSION_COMMAND,
+    add_user_to_group, daemon_version, restart_daemon, test_daemon,
+)
+from ui.widgets.page_header import PageHeader
 
 # The application stylesheet is owned by the general window.
-_STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "style.css")
+_STYLE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "data", "style.css")
 
 
 # --- small dialog helpers ---------------------------------------------------
@@ -86,14 +91,10 @@ class SummaryPage(Gtk.Box):
     def __init__(self, application_core, config_path: str,
                  base_path: Optional[str]) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("summary-page")
         self.application_core = application_core
 
-        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        header.append(Gtk.Label(label=tr("step.summary.title"), xalign=0.0,
-                                css_classes=["title-2"]))
-        header.append(Gtk.Label(label=tr("step.summary.subtitle"), xalign=0.0,
-                                css_classes=["dim-label"], wrap=True))
-        self.append(header)
+        self.append(PageHeader("step.summary.title", "step.summary.subtitle"))
         if config_path:
             self.append(Gtk.Label(label=tr("summary.path").format(path=config_path),
                                   xalign=0.0, wrap=True, css_classes=["dim-label"]))
@@ -102,8 +103,8 @@ class SummaryPage(Gtk.Box):
                                   xalign=0.0, wrap=True, css_classes=["dim-label"]))
 
         scroller = Gtk.ScrolledWindow(vexpand=True)
-        view = Gtk.TextView(editable=False, monospace=True,
-                            wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        view = Gtk.TextView(editable=False, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        view.add_css_class("summary-view")
         self._buffer = view.get_buffer()
         scroller.set_child(view)
         self.append(scroller)
@@ -128,17 +129,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._dirty = False
         self.pages: Dict[str, object] = {}
 
-        # Any section change marks the window dirty and refreshes the gating.
-        for section in self.core.sections:
-            section.subscribe_change_listener(lambda _key: self._on_state_changed())
+        # The store drives the dirty flag and the dependent-option gating.
+        if self.core.store is not None:
+            self.core.store.subscribe(self._on_store_state)
 
         self._build_ui()
-        self._warn_language_errors()
-
-    def _section_core(self, section_id: str):
-        """The section core registered under ``section_id``."""
-        return next(section for section in self.core.sections
-                    if section.section_id == section_id)
+        for message in describe_lang_errors():
+            self.toast_overlay.add_toast(Adw.Toast(title=message))
 
     def _static_page(self, section_id: str):
         """Build a stateless section page (no state/initializer), by convention."""
@@ -180,7 +177,10 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar.add_bottom_bar(self._build_action_bar())
         help_button = Gtk.Button(icon_name="help-about-symbolic")
         help_button.set_tooltip_text(tr("header.help.tooltip"))
-        help_button.connect("clicked", lambda *_: self._show_help())
+        help_button.connect(
+            "clicked",
+            lambda *_: info_dialog(self, tr("dlg.help.title"),
+                                   tr("dlg.help.body")).present())
         header.pack_end(help_button)
         header.pack_end(self._build_language_button())
 
@@ -196,9 +196,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_titled(self.presentation_page, "presentation",
                               tr("tab.presentation"))
 
-        for section_id, (_core_class, _initializer) in SECTION_MODULES.items():
+        for section_core in self.core.sections:
+            section_id = section_core.section_id
             ui_module = importlib.import_module(f"sections.{section_id}.ui")
-            page = ui_module.build_page(self._section_core(section_id))
+            page = ui_module.build_page(section_core)
             self.pages[section_id] = page
             self.stack.add_titled(page, section_id, tr(ui_module.TAB_TITLE_ID))
 
@@ -210,7 +211,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.pages["daemon"] = self.daemon_page
         self.stack.add_titled(self.daemon_page, "daemon", tr("tab.daemon"))
 
-        first_section = next(iter(SECTION_MODULES))
+        first_section = self.core.sections[0].section_id
         self.stack.set_visible_child_name(first_section)
 
         switcher = Adw.ViewSwitcher(stack=self.stack)
@@ -219,10 +220,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.set_title_widget(switcher)
 
         wrapper = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        wrapper.set_margin_top(12)
-        wrapper.set_margin_bottom(12)
-        wrapper.set_margin_start(16)
-        wrapper.set_margin_end(16)
+        wrapper.add_css_class("page-wrapper")
         wrapper.append(self.stack)
         toolbar.set_content(wrapper)
         self.connect("close-request", self._on_close_request)
@@ -241,18 +239,10 @@ class MainWindow(Adw.ApplicationWindow):
         button.set_menu_model(menu)
         return button
 
-    def notify_language_restart(self) -> None:
-        """Tell the user the new language applies on the next start."""
-        info_dialog(self, tr("dlg.lang.title"), tr("dlg.lang.body")).present()
-
     # -- dirty tracking ------------------------------------------------------
-    def _on_state_changed(self) -> None:
-        """Mark the window dirty and refresh the dependent-option gating."""
-        self._dirty = True
-        self._refresh_gating()
-
-    def _refresh_gating(self) -> None:
-        """Ask every page that supports it to re-evaluate its option gating."""
+    def _on_store_state(self, root: dict) -> None:
+        """Sync the dirty flag and refresh the dependent-option gating."""
+        self._dirty = bool(root.get("dirty", False))
         for page in self.pages.values():
             if hasattr(page, "refresh_gating"):
                 page.refresh_gating()
@@ -317,7 +307,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response != tr(confirm_id):
             return
         if restore():
-            initializer.reload(self.state)
+            reload(self.state)
             self._refresh_all()
             self._dirty = False
             self.toast_overlay.add_toast(Adw.Toast(title=tr(f"{prefix}.ok")))
@@ -328,18 +318,18 @@ class MainWindow(Adw.ApplicationWindow):
     # -- daemon actions ------------------------------------------------------
     def do_restart_daemon(self) -> None:
         """Restart the daemon and show the command + output in the console."""
-        self._show_daemon_result(daemon.restart_daemon(),
-                                 "systemctl --user restart gamemoded")
+        self._show_daemon_result(restart_daemon(), RESTART_COMMAND)
 
     def run_daemon_tests(self) -> None:
         """Run the daemon diagnostics and version, showing them in the console."""
-        self._show_daemon_result(daemon.test_daemon(), "gamemoded -t")
-        self._show_daemon_result(daemon.daemon_version(), "gamemoded --version")
+        self._show_daemon_result(test_daemon(), TEST_COMMAND)
+        self._show_daemon_result(daemon_version(), VERSION_COMMAND)
 
     def do_add_group(self) -> None:
         """Add the current user to the gamemode group and refresh the status."""
-        result = daemon.add_user_to_group()
-        self._show_daemon_result(result, f"usermod -aG gamemode {getpass.getuser()}")
+        result = add_user_to_group()
+        self._show_daemon_result(
+            result, GROUP_COMMAND.format(user=getpass.getuser()))
         if result.success:
             self.pages["daemon"].show_output(tr("dlg.logout.body"))
         self.pages["daemon"].refresh_group()
@@ -348,14 +338,6 @@ class MainWindow(Adw.ApplicationWindow):
         page = self.pages["daemon"]
         page.show_command(result.command or fallback_command)
         page.show_output(result.output)
-
-    def _show_help(self) -> None:
-        info_dialog(self, tr("dlg.help.title"), tr("dlg.help.body")).present()
-
-    def _warn_language_errors(self) -> None:
-        """Show a toast for every language-configuration error (non-blocking)."""
-        for message in i18n.describe_lang_errors():
-            self.toast_overlay.add_toast(Adw.Toast(title=message))
 
 
 # --- application ------------------------------------------------------------
@@ -367,12 +349,9 @@ class Application(Adw.Application):
         super().__init__(application_id="io.github.gamemodegui.GameModeGui",
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
         self._window: Optional[MainWindow] = None
-        self._install_actions()
-
-    def _install_actions(self) -> None:
         action = Gio.SimpleAction.new_stateful(
             "set-lang", GLib.VariantType.new("s"),
-            GLib.Variant.new_string(i18n.current_lang()))
+            GLib.Variant.new_string(current_lang()))
         action.connect("change-state", self._on_set_lang)
         self.add_action(action)
 
@@ -381,14 +360,15 @@ class Application(Adw.Application):
         if code == action.get_state().get_string():
             return
         action.set_state(value)
-        i18n.save_lang(code)  # the saved choice takes precedence over everything
+        save_lang(code)  # the saved choice takes precedence over everything
         if self._window is not None:
-            self._window.notify_language_restart()
+            info_dialog(self._window, tr("dlg.lang.title"),
+                        tr("dlg.lang.body")).present()
 
     def do_activate(self) -> None:
-        i18n.ensure_settings()
+        ensure_settings()
         if self._window is None:
-            self._window = MainWindow(initializer.build_app(), application=self)
+            self._window = MainWindow(build_app(), application=self)
         self._window.present()
 
 

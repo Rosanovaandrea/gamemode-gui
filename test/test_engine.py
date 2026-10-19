@@ -14,12 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Isolation: the language preference must not read the real config.
 os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="gamemodegui_engine_")
 
-import i18n  # noqa: E402
+import i18n.settings as i18n_settings  # noqa: E402
 from sections.cpu.core import CpuCore, available_cores, expand_cpu_list  # noqa: E402
 from sections.custom.core import CustomCore  # noqa: E402
 from sections.general.core import GeneralCore, available_governors  # noqa: E402
 from sections.general.options import GENERAL_OPTIONS  # noqa: E402
 from sections.gpu.core import GpuCore  # noqa: E402
+from services.privileged import COMMAND_COMMIT  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # General: render only active options + roundtrip + kernel governors
@@ -111,33 +112,33 @@ print("== custom core OK")
 # ---------------------------------------------------------------------------
 # i18n: translations, normalisation, detection and preference
 # ---------------------------------------------------------------------------
-from i18n import Translator  # noqa: E402
+from i18n.translator import Translator  # noqa: E402
 
 assert Translator("it").tr("window.title") == "GameMode GUI"
 assert Translator("it").tr("btn.save") == "Salva"
 assert Translator("en").tr("btn.save") == "Save"
 assert Translator("it").tr("key.missing") == "key.missing"
 
-assert i18n.supported_lang("it_IT.UTF-8") == "it"
-assert i18n.supported_lang("en-US") == "en"
-assert i18n.supported_lang("fr_FR.UTF-8") is None
+assert i18n_settings.supported_lang("it_IT.UTF-8") == "it"
+assert i18n_settings.supported_lang("en-US") == "en"
+assert i18n_settings.supported_lang("fr_FR.UTF-8") is None
 
 os.environ["LC_ALL"] = "it_IT.UTF-8"
-assert i18n.detect_system_lang() == "it"
+assert i18n_settings.detect_system_lang() == "it"
 os.environ["LC_ALL"] = "fr_FR.UTF-8"
-assert i18n.detect_system_lang() == "en"
+assert i18n_settings.detect_system_lang() == "en"
 del os.environ["LC_ALL"]
 
 with tempfile.TemporaryDirectory() as work:
     os.environ["XDG_CONFIG_HOME"] = work
-    i18n.reset_supported_langs()
+    i18n_settings.reset_supported_langs()
     os.environ["LC_ALL"] = "it_IT.UTF-8"
-    assert i18n.resolve_lang() == "it"
-    i18n.save_lang("en")
-    assert i18n.load_saved_lang() == "en"
-    assert i18n.resolve_lang() == "en"          # the saved choice wins
-    i18n.save_lang("fr")                        # unsupported -> English
-    assert i18n.load_saved_lang() == "en"
+    assert i18n_settings.resolve_lang() == "it"
+    i18n_settings.save_lang("en")
+    assert i18n_settings.load_saved_lang() == "en"
+    assert i18n_settings.resolve_lang() == "en"          # the saved choice wins
+    i18n_settings.save_lang("fr")                        # unsupported -> English
+    assert i18n_settings.load_saved_lang() == "en"
     del os.environ["LC_ALL"]
 print("== i18n OK")
 
@@ -147,8 +148,9 @@ print("== i18n OK")
 with tempfile.TemporaryDirectory() as work:
     path = os.path.join(work, "gamemode.ini")
     helper = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "privileged.py")
-    process = subprocess.run([sys.executable, helper, "commit", path],
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "services", "privileged_helper.py")
+    process = subprocess.run([sys.executable, helper, COMMAND_COMMIT, path],
                              input=general_text, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
     assert open(path, encoding="utf-8").read() == general_text

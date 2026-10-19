@@ -93,6 +93,10 @@ Some options (especially the GPU/iGPU ones) may not be supported or may not work
 - Feral GameMode (the daemon the GUI configures)
 - `pkexec` (polkit) or `sudo` for the privileged writes to `/etc`
 
+Redux is not required: the application store is a small internal class. GNU
+gettext (`msgfmt`) is only needed to rebuild the `.mo` catalogs after editing a
+`.po` file.
+
 ```bash
 # Fedora / RHEL
 sudo dnf install python3-gobject gtk4 libadwaita gamemode
@@ -120,6 +124,7 @@ GAMEMODE_CONFIG=/tmp/try/gamemode.ini python3 main.py
 python3 test/sections/run_all.py  # per-section integration tests, no display
 python3 test/test_engine.py       # engine, no display
 python3 test/test_app.py          # application (bootstrap / save / restore), no display
+python3 test/test_state.py        # application store, no display
 python3 test/smoke_test.py        # interface (needs DISPLAY), uses a temporary folder
 ```
 
@@ -149,10 +154,12 @@ Both install:
 ```text
 /usr/bin/gamemode-gui                                        # launcher
 /usr/share/gamemode-gui/main.py                              # entry point
-/usr/share/gamemode-gui/*.py                                 # application modules
+/usr/share/gamemode-gui/*.py                                 # core modules
+/usr/share/gamemode-gui/{services,i18n,state,ui}/              # internal libraries
 /usr/share/gamemode-gui/sections/                            # one folder per section
 /usr/share/gamemode-gui/data/                                # style, translations
-/usr/share/gamemode-gui/data/locale/{it,en}.xml              # translations
+/usr/share/gamemode-gui/data/locale/*.po                     # translation sources
+/usr/share/gamemode-gui/data/locale/*/LC_MESSAGES/*.mo
 /usr/share/applications/io.github.gamemodegui.GameModeGui.desktop
 /usr/share/icons/hicolor/scalable/apps/io.github.gamemodegui.GameModeGui.svg
 ```

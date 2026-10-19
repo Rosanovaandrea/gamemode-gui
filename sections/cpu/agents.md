@@ -9,8 +9,6 @@ Manages the `[cpu]` keys: core pinning and core parking. The options live in
 - `core.py` — `CpuCore` (extends `SectionCore`), plus `available_cores()` and
   `expand_cpu_list()` which read/parse the online CPU list from the kernel.
 - `ui.py` — `CpuPage`: the pinning row (checkboxes) and the parking switch.
-- `initializer.py` — reads the `[cpu]` keys from the base/override texts; it
-  delegates to `sections/initializer.py`.
 
 ## Notes
 

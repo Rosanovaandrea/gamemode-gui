@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from i18n import tr
+from i18n.translator import tr
 
 
 @dataclass(frozen=True)

@@ -12,8 +12,7 @@ in `options.py`.
   (`apply_parsed_section(..., append=True)`).
 - `ui.py` — `CustomPage`: the **notifications card** at the top (the two
   `toggle_entry` switches) plus the list editors and the timeout stepper.
-- `initializer.py` — reads the `[custom]` keys; the start/end lists are **appended**
-  (base, then override), as GameMode does. It delegates to `sections/initializer.py`.
+  `append_on_load = True` makes the override lists extend the base lists.
 
 ## Notes
 

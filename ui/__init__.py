@@ -1,0 +1,1 @@
+"""GTK/Libadwaita view layer."""

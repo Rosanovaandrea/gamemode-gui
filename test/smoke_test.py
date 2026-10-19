@@ -26,14 +26,16 @@ os.makedirs(os.path.dirname(os.environ["GAMEMODE_CONFIG"]), exist_ok=True)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import i18n, initializer, ui  # noqa: E402
+from i18n.translator import tr  # noqa: E402
+import initializer  # noqa: E402
+from ui.window import MainWindow  # noqa: E402
 
 results = []
 
 
 def exercise(*_):
     app = Gtk.Application.new("io.github.gamemodegui.smoke", 0)
-    window = ui.MainWindow(initializer.build_app(), application=app)
+    window = MainWindow(initializer.build_app(), application=app)
     window.present()
 
     results.append(("pages", list(window.pages.keys())))
@@ -53,9 +55,9 @@ def exercise(*_):
 
     collect_labels(window._build_action_bar())
     results.append(("global_actions",
-                    i18n.tr("btn.restore_backup") in labels
-                    and i18n.tr("btn.restore_orig") in labels
-                    and i18n.tr("btn.save") in labels))
+                    tr("btn.restore_backup") in labels
+                    and tr("btn.restore_orig") in labels
+                    and tr("btn.save") in labels))
 
     general = window.pages["general"]
     results.append(("general_rows", len(general.rows)))
