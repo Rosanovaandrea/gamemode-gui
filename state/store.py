@@ -106,30 +106,10 @@ class AppStore:
     def is_dirty(self) -> bool:
         return bool(self._state.get("dirty", False))
 
-    def subscribe(self, listener: Callable[[dict], None]) -> Callable[[], None]:
-        """Subscribe to every store change; returns an unsubscribe callback."""
+    def subscribe(self, listener: Callable[[dict], None]) -> None:
+        """Register a callback and immediately send the current state."""
         self._listeners.append(listener)
         listener(self._state)
-
-        def unsubscribe() -> None:
-            if listener in self._listeners:
-                self._listeners.remove(listener)
-
-        return unsubscribe
-
-    def subscribe_section(self, section_id: str,
-                          listener: Callable[[dict], None]) -> Callable[[], None]:
-        """Subscribe to one section; the callback receives its values."""
-        last = {"values": self.section_state(section_id)}
-
-        def forward(root: dict) -> None:
-            values = root["sections"].get(section_id, {})
-            if values == last["values"]:
-                return
-            last["values"] = _deep(values)
-            listener(values)
-
-        return self.subscribe(forward)
 
 
 def section_defaults(options: Iterable) -> dict:

@@ -19,7 +19,7 @@ assert store.section_state("demo") == {"value": 1, "items": ["a"]}
 assert not store.is_dirty()
 
 events = []
-store.subscribe_section("demo", events.append)
+store.subscribe(lambda root: events.append(root["sections"]["demo"]))
 store.dispatch(option_action("demo", "value", 7))
 assert store.section_state("demo")["value"] == 7
 assert events[-1]["value"] == 7

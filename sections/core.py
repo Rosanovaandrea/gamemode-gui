@@ -7,7 +7,7 @@ the existing view listeners, so the section APIs stay unchanged.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from state import (
     AppStore, load_action, option_action, reset_section, section_defaults,
@@ -47,27 +47,7 @@ class SectionCore:
         self.store = store or AppStore({self.section_id: self._defaults})
         self.store.ensure_section(self.section_id, self._defaults)
         self.state = SectionState(self)
-        self._change_listeners: List[Callable[[str], None]] = []
-        self._last_values = self.store.section_state(self.section_id)
-        self.store.subscribe_section(self.section_id, self._on_store_change)
         self._install_option_accessors()
-
-    # -- change notification -------------------------------------------------
-    def subscribe_change_listener(self, listener: Callable[[str], None]) -> None:
-        """Register a view callback; it receives the option key that changed."""
-        self._change_listeners.append(listener)
-
-    def _on_store_change(self, values: Dict[str, object]) -> None:
-        """Forward the keys that changed in this section to the listeners."""
-        changed = [key for key, value in values.items()
-                   if self._last_values.get(key) != value]
-        self._last_values = values
-        for key in changed:
-            self._notify_change_listeners(key)
-
-    def _notify_change_listeners(self, changed_option_key: str) -> None:
-        for listener in self._change_listeners:
-            listener(changed_option_key)
 
     # -- speaking accessors, one per option ----------------------------------
     def _install_option_accessors(self) -> None:

@@ -129,13 +129,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._dirty = False
         self.pages: Dict[str, object] = {}
 
-        # The store is the source of truth for the dirty flag.
+        # The store drives the dirty flag and the dependent-option gating.
         if self.core.store is not None:
             self.core.store.subscribe(self._on_store_state)
-
-        # Any section change refreshes the dependent-option gating.
-        for section in self.core.sections:
-            section.subscribe_change_listener(lambda _key: self._on_state_changed())
 
         self._build_ui()
         self._warn_language_errors()
@@ -252,13 +248,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- dirty tracking ------------------------------------------------------
     def _on_store_state(self, root: dict) -> None:
-        """Mirror the store's dirty flag in the window."""
+        """Sync the dirty flag and refresh the dependent-option gating."""
         self._dirty = bool(root.get("dirty", False))
-
-    def _on_state_changed(self) -> None:
-        """Refresh the dependent-option gating after a section change."""
-        if self.core.store is None:
-            self._dirty = True
         self._refresh_gating()
 
     def _refresh_gating(self) -> None:
