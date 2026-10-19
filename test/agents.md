@@ -30,6 +30,7 @@ test framework), so the same command works locally and in CI.
 python3 test/sections/run_all.py   # per-section integration tests
 python3 test/test_engine.py        # engine
 python3 test/test_app.py           # application
+python3 test/test_state.py         # Redux store
 python3 test/smoke_test.py         # interface (needs DISPLAY)
 ```
 

@@ -51,8 +51,9 @@ class SectionPage(Gtk.Box):
         for margin in ("top", "bottom", "start", "end"):
             getattr(card, f"set_margin_{margin}")(4)
         title = Gtk.Label(label=tr(title_id), xalign=0.0, css_classes=["heading"])
-        for margin in ("start", "top", "bottom"):
-            getattr(title, f"set_margin_{margin}")(12 if margin == "start" else 8)
+        title.set_margin_start(12)
+        title.set_margin_top(8)
+        title.set_margin_bottom(4)
         card.append(title)
         listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         for spec in self.core.options:

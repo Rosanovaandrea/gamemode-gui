@@ -14,12 +14,12 @@ sys.modules[__name__] = _real
 
 _MODULES = (
     "core", "initializer",
-    "general", "general.options", "general.core", "general.ui", "general.initializer",
-    "gpu", "gpu.options", "gpu.core", "gpu.ui", "gpu.initializer",
-    "cpu", "cpu.options", "cpu.core", "cpu.ui", "cpu.initializer",
-    "custom", "custom.options", "custom.core", "custom.ui", "custom.initializer",
-    "presentation", "presentation.core", "presentation.ui",
-    "daemon", "daemon.core", "daemon.ui",
+    "general", "general.options", "general.core", "general.initializer",
+    "gpu", "gpu.options", "gpu.core", "gpu.initializer",
+    "cpu", "cpu.options", "cpu.core", "cpu.initializer",
+    "custom", "custom.options", "custom.core", "custom.initializer",
+    "presentation", "presentation.core",
+    "daemon", "daemon.core",
 )
 
 for _name in _MODULES:
