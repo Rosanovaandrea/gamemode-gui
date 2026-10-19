@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -90,15 +91,20 @@ def check(locale_dir: str = DEFAULT_LOCALE) -> int:
         code = name[:-3]
         source = os.path.join(locale_dir, name)
         target = _mo_path(locale_dir, code)
-        if not os.path.isfile(target):
-            print(f"missing MO: {target}")
-            failed += 1
-        elif os.path.getmtime(target) < os.path.getmtime(source):
-            print(f"stale MO: {target}")
-            failed += 1
-        else:
-            result = subprocess.run(["msgfmt", "--check", "-o", os.devnull, source])
-            failed += result.returncode != 0
+        with tempfile.NamedTemporaryFile(suffix=".mo", delete=False) as handle:
+            generated = handle.name
+        try:
+            result = subprocess.run(["msgfmt", "--check", "-o", generated, source])
+            if result.returncode != 0:
+                failed += 1
+            elif not os.path.isfile(target):
+                print(f"missing MO: {target}")
+                failed += 1
+            elif open(generated, "rb").read() != open(target, "rb").read():
+                print(f"stale MO: {target}")
+                failed += 1
+        finally:
+            os.remove(generated)
     return failed
 
 

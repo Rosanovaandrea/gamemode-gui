@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           # dpkg-deb (from the dpkg package) for the .deb; rpm/rpmbuild for the .rpm.
-          sudo apt-get install -y dpkg-dev rpm
+          sudo apt-get install -y dpkg-dev rpm gettext
 
       - name: Run tests
         run: |
@@ -39,6 +39,7 @@ jobs:
           python3 test/test_engine.py
           python3 test/test_app.py
           python3 test/test_state.py
+          python3 scripts/locales.py check
 
       - name: Build packages
         run: |
