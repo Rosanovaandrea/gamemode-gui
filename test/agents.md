@@ -21,6 +21,7 @@ test framework), so the same command works locally and in CI.
 - `test_engine.py` — each section's options and INI (de)serialisation, i18n and the
   privileged helper.
 - `test_app.py` — bootstrap, atomic save, `.orig`/`.bak`, restore and reload.
+- `test_state.py` — Redux actions/reducers/store, subscriptions and dirty flag.
 - `smoke_test.py` — builds the real GTK window (needs a display).
 
 ## Run

@@ -38,6 +38,7 @@ assert custom.get_start() == ["base1"]
 # A speaking setter updates the section state.
 general.set_reaper_freq(10)
 assert general.get_reaper_freq() == 10
+assert app.core.store.is_dirty()
 
 # The general core orchestrates the sections' own output.
 content = app.core.render()
@@ -47,6 +48,7 @@ assert "reaper_freq=10" in content and "start=base1" in content
 app.core.save()
 path = app.config_path
 assert os.path.isfile(path)
+assert not app.core.store.is_dirty()
 assert open(path, encoding="utf-8").read() == content
 assert open(path + ".orig", encoding="utf-8").read() == ""  # no active file to preserve
 assert not os.path.isfile(path + ".bak")

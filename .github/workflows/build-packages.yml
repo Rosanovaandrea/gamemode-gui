@@ -33,6 +33,13 @@ jobs:
           # dpkg-deb (from the dpkg package) for the .deb; rpm/rpmbuild for the .rpm.
           sudo apt-get install -y dpkg-dev rpm
 
+      - name: Run tests
+        run: |
+          python3 test/sections/run_all.py
+          python3 test/test_engine.py
+          python3 test/test_app.py
+          python3 test/test_state.py
+
       - name: Build packages
         run: |
           # If we are on a tag, use the version from the tag (e.g. v1.2.3 -> 1.2.3).

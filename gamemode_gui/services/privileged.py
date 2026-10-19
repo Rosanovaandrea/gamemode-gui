@@ -11,10 +11,8 @@ from .commands import CommandResult, privileged_prefixes
 
 
 def _helper_path() -> str:
-    # The standalone root helper stays at the application root: from
-    # ``gamemode_gui/services/`` go up two levels.
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(root, "privileged.py")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "privileged_helper.py")
 
 
 def run_privileged(command: str, path: str, content: str = "", timeout: int = 60,

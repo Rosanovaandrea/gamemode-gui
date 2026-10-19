@@ -27,9 +27,9 @@ mkdir -p "$WORK" "$DIST_DIR"
 # ---------------------------------------------------------------------------
 SRCDIR="$WORK/$NAME-$VERSION"
 mkdir -p "$SRCDIR/packaging"
-install -m 644 "$ROOT"/{core.py,ui.py,initializer.py,spec.py,i18n.py,fileops.py,privileged.py,widgets.py,LICENSE} "$SRCDIR/"
+install -m 644 "$ROOT/LICENSE" "$SRCDIR/"
 install -m 755 "$ROOT/main.py" "$SRCDIR/main.py"
-cp -r "$ROOT/sections" "$ROOT/data" "$SRCDIR/"
+cp -r "$ROOT/gamemode_gui" "$SRCDIR/"
 find "$SRCDIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
 install -m 644 "$HERE"/io.github.gamemodegui.GameModeGui.desktop \
     "$HERE"/io.github.gamemodegui.GameModeGui.svg \
@@ -52,10 +52,8 @@ build_deb() {
         "$tree/usr/share/icons/hicolor/scalable/apps" \
         "$tree/usr/share/doc/$NAME"
 
-    install -m 644 "$ROOT"/{core.py,ui.py,initializer.py,spec.py,i18n.py,fileops.py,privileged.py,widgets.py} \
-        "$tree/usr/share/$NAME/"
     install -m 755 "$ROOT/main.py" "$tree/usr/share/$NAME/main.py"
-    cp -r "$ROOT/sections" "$ROOT/data" "$tree/usr/share/$NAME/"
+    cp -r "$ROOT/gamemode_gui" "$tree/usr/share/$NAME/"
     find "$tree/usr/share/$NAME" -name '__pycache__' -type d -prune -exec rm -rf {} +
     install -m 755 "$HERE/gamemode-gui" "$tree/usr/bin/gamemode-gui"
     install -m 644 "$HERE/io.github.gamemodegui.GameModeGui.desktop" \

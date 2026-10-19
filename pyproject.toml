@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gamemode-gui"
+version = "1.0.0"
+description = "GTK4/Libadwaita GUI for Feral GameMode"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = ["PyGObject>=3.42"]
+classifiers = [
+  "Environment :: X11 Applications :: GTK",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Systems Administration",
+]
+
+[project.scripts]
+gamemode-gui = "gamemode_gui.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["gamemode_gui*"]
+
+[tool.setuptools.package-data]
+gamemode_gui = [
+  "data/style.css",
+  "data/locale/*.po",
+  "data/locale/*.json",
+  "data/locale/*/LC_MESSAGES/*.mo",
+  "vendor/LICENSES/*",
+]

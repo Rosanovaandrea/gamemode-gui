@@ -51,6 +51,10 @@ def convert(xml_dir: str = DEFAULT_LOCALE, po_dir: str = DEFAULT_LOCALE) -> None
             '"MIME-Version: 1.0\\n"',
             '"Content-Type: text/plain; charset=UTF-8\\n"',
             '"Content-Transfer-Encoding: 8bit\\n"',
+            '"Project-Id-Version: gamemode-gui 1.0.0\\n"',
+            '"PO-Revision-Date: 2026-10-19 00:00+0000\\n"',
+            '"Last-Translator: GameMode GUI contributors\\n"',
+            '"Language-Team: GameMode GUI contributors\\n"',
             f'"Language-Name: {_po_escape(label)}\\n"',
             "",
         ]
