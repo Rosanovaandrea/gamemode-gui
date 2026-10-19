@@ -14,31 +14,11 @@ from typing import Dict, List, Optional
 from sections.core import SectionCore
 from sections.cpu.options import CPU_OPTIONS
 from spec import OptionSpec
+from gamemode_gui.utils import expand_cpu_list
 
 SECTION_ID = "cpu"
 
 _CPU_ONLINE_FILE = "/sys/devices/system/cpu/online"
-
-
-def expand_cpu_list(text: str) -> List[int]:
-    """Expand a Linux cpu-list (e.g. ``"0-3,8"``) into a sorted list of ints."""
-    cores: List[int] = []
-    for token in str(text).split(","):
-        token = token.strip()
-        if not token:
-            continue
-        if "-" in token:
-            start, _, end = token.partition("-")
-            try:
-                cores.extend(range(int(start), int(end) + 1))
-            except ValueError:
-                continue
-        else:
-            try:
-                cores.append(int(token))
-            except ValueError:
-                pass
-    return sorted(set(cores))
 
 
 def available_cores() -> List[str]:
