@@ -147,7 +147,8 @@ print("== i18n OK")
 with tempfile.TemporaryDirectory() as work:
     path = os.path.join(work, "gamemode.ini")
     helper = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "privileged.py")
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "services", "privileged_helper.py")
     process = subprocess.run([sys.executable, helper, "commit", path],
                              input=general_text, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr

@@ -14,8 +14,6 @@ in `options.py`.
   `sections/core.py`.
 - `ui.py` — `GeneralPage`: one editable row per option (with the kernel governors as
   choices where relevant), wired to the core; `TAB_TITLE_ID`/`TITLE_ID`/`SUBTITLE_ID`.
-- `initializer.py` — reads the `[general]` keys from the base/override texts and puts
-  them into the state (resetting it first); it delegates to `sections/initializer.py`.
 
 ## Notes
 

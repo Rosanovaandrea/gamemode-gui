@@ -155,7 +155,7 @@ Both install:
 /usr/bin/gamemode-gui                                        # launcher
 /usr/share/gamemode-gui/main.py                              # entry point
 /usr/share/gamemode-gui/*.py                                 # core modules
-/usr/share/gamemode-gui/{config,services,i18n,state,ui}/     # internal libraries
+/usr/share/gamemode-gui/{services,i18n,state,ui}/              # internal libraries
 /usr/share/gamemode-gui/sections/                            # one folder per section
 /usr/share/gamemode-gui/data/                                # style, translations
 /usr/share/gamemode-gui/data/locale/*.po                     # translation sources

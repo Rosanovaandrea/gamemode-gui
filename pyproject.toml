@@ -20,11 +20,11 @@ classifiers = [
 gamemode-gui = "main:main"
 
 [tool.setuptools]
-py-modules = ["main", "core", "initializer", "spec", "privileged", "widgets", "fileops"]
+py-modules = ["main", "core", "initializer", "spec", "configuration"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["config*", "data*", "i18n*", "sections*", "services*", "state*", "ui*", "utils*", "vendor*"]
+include = ["data*", "i18n*", "sections*", "services*", "state*", "ui*", "utils*", "vendor*"]
 
 [tool.setuptools.package-data]
 data = ["style.css", "locale/*.po", "locale/*.json", "locale/*/LC_MESSAGES/*.mo"]

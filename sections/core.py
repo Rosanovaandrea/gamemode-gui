@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 from state import (
     AppStore, load_action, option_action, reset_section, section_defaults,
 )
+from configuration import extract_section
 from spec import OptionSpec
 
 
@@ -40,6 +41,7 @@ class SectionCore:
 
     section_id = ""
     options: List[OptionSpec] = []
+    append_on_load = False
 
     def __init__(self, store: Optional[AppStore] = None) -> None:
         """Register the section defaults and install the option accessors."""
@@ -84,6 +86,20 @@ class SectionCore:
         return self.is_option_active(dependency) if dependency else True
 
     # -- state ---------------------------------------------------------------
+    def load_texts(self, base_text: str, override_text: str,
+                   session_values: Optional[Dict[str, object]] = None) -> None:
+        """Load this section from the base/override texts and the session."""
+        self.reset_to_defaults()
+        base = extract_section(base_text, self.section_id)
+        override = extract_section(override_text, self.section_id)
+        self.apply_parsed_section(base)
+        if self.append_on_load:
+            self.apply_parsed_section(override, append=True)
+        else:
+            self.apply_parsed_section(override)
+        if not base and not override and session_values:
+            self.apply_saved_values(session_values)
+
     def reset_to_defaults(self) -> None:
         """Reset every option of this section to its default value."""
         self.store.dispatch(reset_section(self.section_id))

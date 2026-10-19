@@ -24,6 +24,7 @@ class CustomCore(SectionCore):
 
     section_id = SECTION_ID
     options = CUSTOM_OPTIONS
+    append_on_load = True
 
     # -- effective values ----------------------------------------------------
     def _effective_list_value(self, list_spec: OptionSpec) -> List[str]:

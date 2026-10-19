@@ -13,8 +13,6 @@ NVIDIA and AMD power-state options. The options live in `GPU_OPTIONS` in
   False.
 - `ui.py` — `GpuPage`: a warning banner at the top, then the rows; dependent rows are
   enabled/disabled according to the master switch. Defines `BANNER_ID`.
-- `initializer.py` — reads the `[gpu]` keys from the base/override texts; it
-  delegates to `sections/initializer.py`.
 
 ## Notes
 

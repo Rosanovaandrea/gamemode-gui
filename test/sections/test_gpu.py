@@ -8,7 +8,6 @@ be ignored while the master switch is off.
 import _testkit
 _testkit.isolate()
 
-from sections.gpu import initializer as gpu_initializer  # noqa: E402
 from sections.gpu.core import GpuCore  # noqa: E402
 
 MASTER = "apply_gpu_optimisations"
@@ -17,8 +16,7 @@ MASTER = "apply_gpu_optimisations"
 def main():
     # --- happy path
     core = GpuCore()
-    gpu_initializer.initialize(
-        core, "[gpu]\napply_gpu_optimisations=accept-responsibility\ngpu_device=1\n", "")
+    core.load_texts("[gpu]\napply_gpu_optimisations=accept-responsibility\ngpu_device=1\n", "")
     _testkit.equal("master switch parsed", core.get_apply_gpu_optimisations(),
                    "accept-responsibility")
     _testkit.equal("device parsed", core.get_gpu_device(), 1)
@@ -41,13 +39,13 @@ def main():
 
     # A file that sets the subs but leaves the master off must write nothing.
     off_file = GpuCore()
-    gpu_initializer.initialize(off_file, "[gpu]\ngpu_device=3\n", "")
+    off_file.load_texts("[gpu]\ngpu_device=3\n", "")
     _testkit.equal("subs set while master is off are not written",
                    off_file.render_ini_section(), "")
 
     # --- invalid integer keeps the default
     broken = GpuCore()
-    gpu_initializer.initialize(broken, "[gpu]\ngpu_device=not-a-number\n", "")
+    broken.load_texts("[gpu]\ngpu_device=not-a-number\n", "")
     _testkit.equal("invalid int keeps the default", broken.get_gpu_device(), 0)
 
     # --- unchanged dependent options are not written, even with the master on

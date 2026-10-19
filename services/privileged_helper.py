@@ -10,9 +10,9 @@ Why does it exist?
     user, so all *writes* (tmp, backup, replace, rollback) must happen in a
     privileged process.
 
-The atomic write/backup/rollback logic is NOT here: it lives in ``fileops.py``,
-shared with the GUI's local path. This file only handles command-line parsing and
-stdin I/O.
+The atomic write/backup/rollback logic is NOT here: it lives in
+``configuration.py``, shared with the GUI's local path. This file only handles
+command-line parsing and stdin I/O.
 
 Commands:
     commit <path> [seed]     rewrite the file reading the content from stdin.
@@ -38,7 +38,9 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from config import fileops
+from configuration import (
+    ensure_orig, restore_from_backup, restore_from_orig, write_commit,
+)
 
 
 def _read_seed(path: str | None) -> str | None:
@@ -65,14 +67,14 @@ def main(argv: list[str]) -> int:
             case "commit":
                 content = sys.stdin.read()
                 seed_path = argv[2] if len(argv) > 2 else None
-                fileops.write_commit(target, content,
+                write_commit(target, content,
                                      orig_seed_content=_read_seed(seed_path))
             case "restore-backup":
-                fileops.restore_from_backup(target)
+                restore_from_backup(target)
             case "restore-orig":
-                fileops.restore_from_orig(target)
+                restore_from_orig(target)
             case "ensure-orig":
-                fileops.ensure_orig(target, seed_content=sys.stdin.read())
+                ensure_orig(target, seed_content=sys.stdin.read())
             case _:
                 sys.stderr.write(f"unknown command: {command}\n")
                 return 2

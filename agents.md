@@ -14,15 +14,15 @@ testable libraries:
 | --- | --- |
 | `i18n` | gettext catalogs, language detection and `settings.json` |
 | `state` | Redux actions/reducers/store and selectors |
-| `config` | paths, INI slices, session sidecar, atomic fileops |
+| `configuration.py` | paths, INI slices, session, atomic copy-on-write |
 | `services` | commands, pkexec/sudo, daemon actions, root helper |
 | `sections` | the self-contained `gamemode.ini` sections |
 | `ui` | window, pages and the reusable widget library |
 | `utils` | shared helpers (e.g. cpu-list expansion) |
 | `vendor` | vendored `redux-py` + `Rx` (MIT) |
 
-The top-level modules (`core.py`, `initializer.py`, `spec.py`, `main.py`) are the
-entry points; new code imports the libraries above directly.
+The top-level modules (`core.py`, `initializer.py`, `configuration.py`, `spec.py`,
+`main.py`) are the entry points; new code imports the libraries above directly.
 
 ## State flow
 
@@ -32,13 +32,12 @@ Each stateful section declares `section_id` and `options` and extends
 
 - speaking `get_<key>()` / `set_<key>()` accessors stay available;
 - setters dispatch `SET_OPTION`; the store notifies subscribers;
-- `subscribe_change_listener()` keeps the previous view API;
 - `render_ini_section()` and `apply_parsed_section()` remain section-specific.
 
 The store holds `{sections: {id: values}, dirty: bool}`. Reducers are pure;
-file I/O stays in `AppCore`/services. `initializer.build_app()` creates one store,
-builds every section with it and marks the initial state clean. `reload()` reloads
-the sections and clears the dirty flag.
+`Configuration` owns reading and writing the file. `initializer.build_app()`
+creates one store, builds every section and calls `Configuration.load()`; `save()`
+asks `Configuration.save()` to render all sections and commit atomically.
 
 ## i18n
 
@@ -62,11 +61,10 @@ by an option-type registry (`factory.py`), so adding a new type is one builder.
 gamemode-gui/
 ├── main.py                    entry point (`python3 main.py`)
 ├── pyproject.toml             package metadata + console script
-├── core.py                    AppCore + ConfigManager
+├── core.py                    AppCore (orchestration)
 ├── initializer.py             build/reload the application
 ├── spec.py                    OptionSpec
-├── privileged.py              compatibility shim for the root helper
-├── config/                    paths, ini, session, fileops
+├── configuration.py           read/write gamemode.ini atomically
 ├── services/                  commands, privileged, daemon, helper
 ├── i18n/                      gettext + settings
 ├── state/                     Redux store

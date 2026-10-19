@@ -22,7 +22,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 import i18n, initializer
 from i18n import tr
-from initializer import App, SECTION_MODULES
+from initializer import App
 from sections.daemon import core as daemon
 from ui.widgets import PageHeader
 
@@ -193,10 +193,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_titled(self.presentation_page, "presentation",
                               tr("tab.presentation"))
 
-        for section_id, (_core_class, _initializer) in SECTION_MODULES.items():
+        for section_core in self.core.sections:
+            section_id = section_core.section_id
             ui_module = importlib.import_module(f"sections.{section_id}.ui")
-            section_core = next(section for section in self.core.sections
-                                if section.section_id == section_id)
             page = ui_module.build_page(section_core)
             self.pages[section_id] = page
             self.stack.add_titled(page, section_id, tr(ui_module.TAB_TITLE_ID))
@@ -209,7 +208,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.pages["daemon"] = self.daemon_page
         self.stack.add_titled(self.daemon_page, "daemon", tr("tab.daemon"))
 
-        first_section = next(iter(SECTION_MODULES))
+        first_section = self.core.sections[0].section_id
         self.stack.set_visible_child_name(first_section)
 
         switcher = Adw.ViewSwitcher(stack=self.stack)
