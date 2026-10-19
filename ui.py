@@ -26,7 +26,8 @@ from initializer import App, SECTION_MODULES
 from sections.daemon import core as daemon
 
 # The application stylesheet is owned by the general window.
-_STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "style.css")
+_STYLE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "gamemode_gui", "data", "style.css")
 
 
 # --- small dialog helpers ---------------------------------------------------

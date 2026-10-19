@@ -1,0 +1,439 @@
+msgid ""
+msgstr ""
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Name: Italiano\n"
+
+msgid "window.title"
+msgstr "GameMode GUI"
+
+msgid "header.cancel"
+msgstr "Annulla"
+
+msgid "header.test"
+msgstr "Test"
+
+msgid "header.test.tooltip"
+msgstr "Esegui i test del daemon e della versione"
+
+msgid "header.help.tooltip"
+msgstr "Aiuto"
+
+msgid "header.lang.tooltip"
+msgstr "Lingua"
+
+msgid "nav.back"
+msgstr "Indietro"
+
+msgid "nav.next"
+msgstr "Avanti"
+
+msgid "nav.close"
+msgstr "Chiudi"
+
+msgid "tab.presentation"
+msgstr "Guida"
+
+msgid "tab.general"
+msgstr "Generale"
+
+msgid "tab.gpu"
+msgstr "GPU"
+
+msgid "tab.cpu"
+msgstr "CPU"
+
+msgid "tab.custom"
+msgstr "Custom"
+
+msgid "tab.summary"
+msgstr "Riepilogo"
+
+msgid "tab.daemon"
+msgstr "Daemon"
+
+msgid "tab.daemon.subtitle"
+msgstr "Riavvio del daemon, test e appartenenza al gruppo gamemode."
+
+msgid "step.general.title"
+msgstr "Generale"
+
+msgid "step.general.subtitle"
+msgstr "Impostazioni principali di GameMode."
+
+msgid "step.gpu.title"
+msgstr "GPU"
+
+msgid "step.gpu.subtitle"
+msgstr "Ottimizzazioni hardware (NVIDIA / AMD)."
+
+msgid "step.cpu.title"
+msgstr "CPU"
+
+msgid "step.cpu.subtitle"
+msgstr "Pinning dei core e parking dei core."
+
+msgid "step.custom.title"
+msgstr "Script personalizzati"
+
+msgid "step.custom.subtitle"
+msgstr "Comandi eseguiti all'avvio e alla fine di GameMode."
+
+msgid "step.summary.title"
+msgstr "Riepilogo e conferma"
+
+msgid "step.summary.subtitle"
+msgstr "Anteprima del file che verrà scritto."
+
+msgid "summary.path"
+msgstr "Override gestito (scritto dalla GUI): {path}"
+
+msgid "summary.base"
+msgstr "Base installata (sola lettura): {path}"
+
+msgid "step.restart.title"
+msgstr "Configurazione salvata"
+
+msgid "gpu.banner"
+msgstr "Attenzione: le ottimizzazioni [gpu] vengono applicate dal daemon solo se il file si trova in /etc/gamemode.ini (percorso privilegiato). Usale a tuo rischio."
+
+msgid "list.add"
+msgstr "Aggiungi"
+
+msgid "list.remove.tooltip"
+msgstr "Rimuovi"
+
+msgid "list.placeholder"
+msgstr "Nuovo valore…"
+
+msgid "choice.unset"
+msgstr "— (predefinito)"
+
+msgid "stepper.decrease"
+msgstr "Diminuisci"
+
+msgid "stepper.increase"
+msgstr "Aumenta"
+
+msgid "btn.save"
+msgstr "Salva"
+
+msgid "btn.save.tooltip"
+msgstr "Salva l'intera configurazione (il file viene riscritto per intero, default inclusi)"
+
+msgid "btn.restore_backup"
+msgstr "Ripristina backup precedente"
+
+msgid "btn.restore_orig"
+msgstr "Ripristina originale"
+
+msgid "btn.restart_daemon"
+msgstr "Riavvia gamemoded"
+
+msgid "btn.test_daemon"
+msgstr "Esegui test del daemon"
+
+msgid "btn.add_group"
+msgstr "Aggiungi al gruppo gamemode"
+
+msgid "daemon.group.title"
+msgstr "Gruppo 'gamemode'"
+
+msgid "daemon.console.title"
+msgstr "Console"
+
+msgid "daemon.console.clear"
+msgstr "Pulisci"
+
+msgid "daemon.console.cmd"
+msgstr "$ {cmd}"
+
+msgid "dlg.yes"
+msgstr "Sì"
+
+msgid "dlg.no"
+msgstr "No"
+
+msgid "dlg.ok"
+msgstr "OK"
+
+msgid "dlg.retry"
+msgstr "Riprova"
+
+msgid "dlg.close"
+msgstr "Chiudi"
+
+msgid "dlg.cancel"
+msgstr "Annulla"
+
+msgid "dlg.confirm"
+msgstr "Conferma"
+
+msgid "dlg.help.title"
+msgstr "Guida rapida"
+
+msgid "dlg.help.body"
+msgstr "Gestione del file gamemode.ini con privilegi.\\n\\nQuesta applicazione gestisce il file di configurazione di GameMode. Le opzioni [gpu] vengono applicate dal daemon solo quando il file risiede in /etc/gamemode.ini (percorso privilegiato): quando attivi le opzioni GPU, verrà chiesto di inserire la password amministratore tramite pkexec.\\n\\nGameMode legge più file in quest'ordine: /usr/share/gamemode/gamemode.ini (fornito dal pacchetto), /etc/gamemode.ini, ~/.config/gamemode.ini e $PWD/gamemode.ini. I valori dei file successivi sovrascrivono i precedenti. Questa GUI scrive in /etc/gamemode.ini, la posizione pensata per la configurazione dell'amministratore (e una delle due, insieme a /usr/share, in cui ha effetto la sezione [gpu]).\\n\\nPer usare renice e core parking è necessario appartenere al gruppo 'gamemode'."
+
+msgid "dlg.unsaved.title"
+msgstr "Modifiche non salvate"
+
+msgid "dlg.unsaved.body"
+msgstr "Sono presenti modifiche non salvate. Uscire senza salvare?"
+
+msgid "dlg.unsaved.exit"
+msgstr "Esci senza salvare"
+
+msgid "dlg.save_daemon.title"
+msgstr "Configurazione salvata"
+
+msgid "dlg.save_daemon.body"
+msgstr "Le modifiche sono state scritte nel file. Per renderle effettive devi riavviare il daemon GameMode dalla scheda \"Daemon\" (pulsante \"Riavvia gamemoded\"). Finché non lo riavvii, il daemon continua a usare la configurazione precedente."
+
+msgid "dlg.save_error.title"
+msgstr "Errore durante il salvataggio"
+
+msgid "dlg.save_error.body"
+msgstr "La scrittura è fallita ed è stato ripristinato il backup precedente.\\n\\nDettagli: {error}"
+
+msgid "dlg.render_error.title"
+msgstr "Impossibile generare la configurazione"
+
+msgid "dlg.restore_bak.title"
+msgstr "Ripristina backup"
+
+msgid "dlg.restore_bak.body"
+msgstr "Ripristinare la configurazione precedente (gamemode.ini.bak)?"
+
+msgid "dlg.restore_bak.ok"
+msgstr "Ripristinato backup precedente."
+
+msgid "dlg.restore_bak.none"
+msgstr "Non esiste un backup precedente."
+
+msgid "dlg.restore_orig.title"
+msgstr "Ripristina originale"
+
+msgid "dlg.restore_orig.body"
+msgstr "Ripristinare la configurazione originale memorizzata in gamemode.ini.orig?"
+
+msgid "dlg.restore_orig.ok"
+msgstr "Configurazione originale ripristinata."
+
+msgid "dlg.restore_orig.none"
+msgstr "Non esiste gamemode.ini.orig."
+
+msgid "dlg.logout.title"
+msgstr "Logout richiesto"
+
+msgid "dlg.logout.body"
+msgstr "Sei stato aggiunto al gruppo 'gamemode'. Per rendere effettivo il cambiamento è necessario eseguire il logout/login. Il riavvio del daemon da solo non basta."
+
+msgid "dlg.lang.title"
+msgstr "Lingua salvata"
+
+msgid "dlg.lang.body"
+msgstr "La lingua verrà applicata al prossimo avvio dell'applicazione."
+
+msgid "step.restart.group_in"
+msgstr "Sei già nel gruppo 'gamemode'."
+
+msgid "step.restart.group_out"
+msgstr "Non risulti ancora nel gruppo 'gamemode'. Dopo l'aggiunta è necessario il logout/login perché abbia effetto."
+
+msgid "step.restart.group_missing"
+msgstr "Il gruppo 'gamemode' non esiste su questo sistema."
+
+msgid "msg.cmd_not_found"
+msgstr "Comando non trovato"
+
+msgid "msg.timeout"
+msgstr "Timeout dopo {timeout}s"
+
+msgid "msg.no_priv_frontend"
+msgstr "Nessun frontend privilegiato disponibile"
+
+msgid "msg.gamemode_not_installed"
+msgstr "GameMode non risulta installato (gamemoded non trovato nel PATH)"
+
+msgid "msg.no_systemd"
+msgstr "Né systemctl né pkill disponibili: impossibile riavviare il daemon"
+
+msgid "msg.usermod_missing"
+msgstr "Comando 'usermod' non trovato (pacchetto shadow/shadow-utils)"
+
+msgid "msg.lang.missing_file"
+msgstr "Lingua '{lang}' ignorata: manca il file locale/{lang}.xml."
+
+msgid "msg.lang.bad_entry"
+msgstr "Voce lingua non valida ignorata: {value}."
+
+msgid "msg.lang.bad_list"
+msgstr "Chiave 'supported_langs' non valida (attesa una lista): uso le lingue predefinite."
+
+msgid "msg.lang.bad_config"
+msgstr "Impossibile leggere settings.json: uso le lingue predefinite."
+
+msgid "msg.lang.empty"
+msgstr "Nessuna lingua valida trovata: uso l'inglese."
+
+msgid "presentation.title"
+msgstr "Guida"
+
+msgid "presentation.subtitle"
+msgstr "Cos'è GameMode, come avviare i giochi con le ottimizzazioni e come usare le varie sezioni della GUI."
+
+msgid "presentation.what.heading"
+msgstr "Cos'è GameMode"
+
+msgid "presentation.what.body"
+msgstr "GameMode è un insieme di ottimizzazioni per Linux applicate temporaneamente (e poi ripristinate) quando avvii un gioco. Quando un gioco lo richiede, il daemon gamemoded modifica al volo impostazioni di sistema come il governor della CPU, la priorità dei processi, la priorità I/O, lo scheduler e — su hardware compatibile — lo stato di potenza della GPU. L'obiettivo è ridurre stutter e latenza e dare più risorse al gioco, tornando alla normalità alla chiusura."
+
+msgid "presentation.why.heading"
+msgstr "Perché GameMode GUI"
+
+msgid "presentation.why.body"
+msgstr "GameMode si configura tramite il file /etc/gamemode.ini: comodo per chi lo conosce, ma facile da sbagliare (commenti, sezioni, valori ammessi). Questa GUI permette di gestire tutte le opzioni in modo visuale e sicuro: il file viene riscritto per intero con scrittura atomica, backup e ripristino. Ogni opzione ha una descrizione di cosa fa, dei benefici e dei possibili problemi."
+
+msgid "presentation.gamemoderun.heading"
+msgstr "Avviare un gioco con gamemoderun"
+
+msgid "presentation.gamemoderun.body"
+msgstr "Il modo più diretto è anteporre il comando gamemoderun all'eseguibile del gioco. Da terminale, ad esempio:\\n\\ngamemoderun ./mio-gioco\\n\\nGameMode entra in \"modalità gioco\" all'avvio del processo e la disattiva quando il gioco si chiude. Con un wrapper (es. DRI_PRIME o optirun) puoi combinarli: gamemoderun DRI_PRIME=1 ./mio-gioco."
+
+msgid "presentation.steam.heading"
+msgstr "Steam"
+
+msgid "presentation.steam.body"
+msgstr "Nella libreria di Steam: tasto destro sul gioco → Proprietà → Opzioni di avvio, e scrivi (o sostituisci) con:\\n\\ngamemoderun %command%\\n\\n%command% viene sostituito da Steam con l'eseguibile del gioco, che gamemoderun avvia in modalità gioco. Funziona anche con i giochi Proton/Windows."
+
+msgid "presentation.lutris.heading"
+msgstr "Lutris"
+
+msgid "presentation.lutris.body"
+msgstr "In Lutris apri la configurazione del gioco (tasto destro → Configure) e nella scheda System options attiva l'opzione \"Enable GameMode\", se disponibile. Per farlo a mano, imposta un prefisso di esecuzione con gamemoderun lasciando %command% come comando del gioco."
+
+msgid "presentation.guide.heading"
+msgstr "Come usare la GUI"
+
+msgid "presentation.guide.body"
+msgstr "L'applicazione è organizzata in schede, una per ogni sezione di gamemode.ini. Modifica le opzioni che ti interessano e usa la barra in basso, sempre disponibile: Salva scrive l'intero file, Ripristina backup precedente riporta all'ultimo stato salvato, Ripristina originale torna alla configurazione pulita. Dopo il salvataggio riavvia il daemon GameMode dalla scheda Daemon perché le modifiche abbiano effetto. Vengono scritti solo i valori diversi dal default, così il file resta leggibile."
+
+msgid "presentation.guide.general.heading"
+msgstr "Generale"
+
+msgid "presentation.guide.general.body"
+msgstr "Il comportamento principale di GameMode: ogni quanto il thread reaper controlla, il governor CPU all'ingresso e all'uscita, il governor iGPU e la soglia di carico, lo scheduler soft real-time, renice, priorità I/O, inibizione dello screensaver e mitigazione split lock. Inizia da qui."
+
+msgid "presentation.guide.gpu.heading"
+msgstr "GPU"
+
+msgid "presentation.guide.gpu.body"
+msgstr "Power state e offset di clock NVIDIA e AMD. L'interruttore principale deve essere attivo perché le altre voci vengano scritte, e ha effetto solo con il file in /etc/gamemode.ini. Modifica un valore alla volta e verifica la stabilità."
+
+msgid "presentation.guide.cpu.heading"
+msgstr "CPU"
+
+msgid "presentation.guide.cpu.body"
+msgstr "Blocca il gioco su un insieme di core (migliore coerenza) e mette offline i core inutilizzati (meno calore e consumo). Il parking richiede l'appartenenza al gruppo 'gamemode', che puoi richiedere dalla scheda Daemon."
+
+msgid "presentation.guide.custom.heading"
+msgstr "Script personalizzati"
+
+msgid "presentation.guide.custom.body"
+msgstr "Comandi eseguiti, tramite /bin/sh, all'avvio e alla fine di GameMode, le due notifiche desktop e il timeout oltre il quale uno script bloccato viene interrotto. Una riga = un comando."
+
+msgid "presentation.guide.daemon.heading"
+msgstr "Daemon"
+
+msgid "presentation.guide.daemon.body"
+msgstr "Riavvia gamemoded dopo il salvataggio, esegui i test e leggi la versione, e aggiungi il tuo utente al gruppo 'gamemode' (necessario per renice e core parking). Dopo l'aggiunta al gruppo è necessario il logout/login."
+
+msgid "presentation.disclaimer.heading"
+msgstr "Avviso"
+
+msgid "presentation.disclaimer.body"
+msgstr "Alcune opzioni (in particolare quelle GPU/iGPU) potrebbero non essere supportate o non funzionare correttamente sui computer portatili, per via di gestione termica e di alimentazione diversa. In generale, modificare governor, profili di piattaforma, stato di potenza della GPU e priorità di sistema può ridurre la stabilità della macchina (crash, freeze, riavvii, surriscaldamento). Applica una modifica alla volta, verifica il risultato e tieni a portata di mano i pulsanti \"Ripristina backup\" e \"Ripristina originale\" nella scheda Riepilogo. Le ottimizzazioni GPU hanno effetto solo se il file è in /etc/gamemode.ini e richiedono l'interruttore di accettazione della responsabilità."
+
+msgid "opt.general.reaper_freq"
+msgstr "Ogni quanti secondi il thread \"reaper\" di GameMode controlla client terminati, modifiche al file di configurazione e bilanciamento CPU/iGPU. Valori bassi reagiscono prima ma usano un po' più di CPU; valori alti sono più leggeri ma meno reattivi. Default: 5."
+
+msgid "opt.general.desiredgov"
+msgstr "Governor CPU impostato all'ingresso in GameMode. \"performance\" tiene i core alla massima frequenza (meno stutter e latenza); \"powersave\"/\"schedutil\" consumano meno. Richiede i privilegi per scrivere il governor (pkexec)."
+
+msgid "opt.general.defaultgov"
+msgstr "Governor CPU impostato all'uscita da GameMode, al posto di quello attivo prima. Se lasciato vuoto, GameMode ripristina il governor precedente. Impostarlo (es. \"powersave\") evita di restare bloccati su \"performance\"."
+
+msgid "opt.general.igpu_desiredgov"
+msgstr "Governor CPU applicato quando la GPU integrata è sotto carico elevato (GameMode lo imposta come il governor CPU). \"powersave\" dà priorità alla GPU quando è lei a lavorare. I valori disponibili sono letti dal kernel."
+
+msgid "opt.general.igpu_power_threshold"
+msgstr "Rapporto tra la potenza (W) della iGPU e quella della CPU oltre il quale la GPU integrata è considerata \"sotto carico\" (tipico 0.3–0.5). -1 disattiva del tutto il controllo iGPU (si usa sempre desiredgov)."
+
+msgid "opt.general.softrealtime"
+msgstr "Politica dello scheduler \"soft real-time\" (SCHED_ISO): \"auto\" con 4 o più core, \"on\" sempre, \"off\" mai. Può migliorare fluidità e latenza nei giochi, ma ha effetto solo su kernel che supportano SCHED_ISO (assente nei kernel upstream)."
+
+msgid "opt.general.renice"
+msgstr "Valore di \"nice\" (0–20) applicato, negato, ai processi di gioco: più alto = priorità CPU maggiore. Migliora la reattività del gioco ma può rallentare il resto del sistema. 0 = nessuna modifica. Richiede il gruppo \"gamemode\"."
+
+msgid "opt.general.ioprio"
+msgstr "Priorità I/O dei processi di gioco: da 0 (massima) a 7 (minima), oppure \"off\" per disattivarla, \"reset\" per il comportamento predefinito basato sulla priorità CPU. Più alta = meno caricamenti a scatti, ma penalizza gli altri processi."
+
+msgid "opt.general.inhibit_screensaver"
+msgstr "Se attivo, GameMode impedisce l'attivazione di screensaver e blocco schermo mentre è in esecuzione. Evita interruzioni durante il gioco; disattivalo se preferisci mantenere il risparmio schermo."
+
+msgid "opt.general.disable_splitlock"
+msgstr "Se attivo, GameMode disattiva la mitigazione \"split lock\" della CPU durante il gioco. Può ridurre i cali di prestazioni di alcuni giochi, ma abbassa la protezione contro certi attacchi: attivalo consapevolmente."
+
+msgid "opt.gpu.enable_power_plan.label"
+msgstr "Abilita modifica power plan GPU"
+
+msgid "opt.gpu.apply_gpu_optimisations"
+msgstr "Interruttore principale delle ottimizzazioni [gpu]: attivandolo accetti la responsabilità e GameMode può applicare overclock e power state NVIDIA/AMD. Senza di esso le altre voci [gpu] vengono ignorate. Ha effetto solo con il file in /etc/gamemode.ini (percorso privilegiato)."
+
+msgid "opt.gpu.gpu_device"
+msgstr "Numero del dispositivo DRM della scheda da controllare (di solito 0), cioè il numero N in /sys/class/drm/cardN/. Utile solo con più GPU, per indicare quale scheda ottimizzare."
+
+msgid "opt.gpu.nv_powermizer_mode"
+msgstr "Modalità PowerMizer NVIDIA: 0 = Adaptive (equilibrata), 1 = Prefer Maximum Performance (massime prestazioni, più consumo/calore), 2 = Auto. Lasciare \"— (predefinito)\" per non modificare. Richiede l'estensione coolbits attiva in nvidia-xconfig."
+
+msgid "opt.gpu.nv_core_clock_mhz_offset"
+msgstr "Offset in MHz sulla frequenza massima del core GPU: positivo = più veloce (overclock), negativo = più lento (undervolt). 0 ripristina i valori predefiniti, -1 (o vuoto) non modifica nulla. Richiede coolbits; valori troppo alti possono causare instabilità o crash."
+
+msgid "opt.gpu.nv_mem_clock_mhz_offset"
+msgstr "Offset in MHz sulla frequenza massima della memoria GPU: positivo = più veloce, negativo = più lento. 0 ripristina i valori predefiniti, -1 (o vuoto) non modifica nulla. Richiede coolbits; overclock eccessivi possono causare artefatti grafici o crash."
+
+msgid "opt.gpu.amd_performance_level"
+msgstr "Livello di prestazioni AMDGPU (power_dpm_force_performance_level): \"low\" riduce consumi e rumore, \"high\" spinge al massimo le prestazioni, \"auto\" lascia gestire al driver, \"manual\" non è supportato qui. Lasciare \"— (predefinito)\" per non modificare. Richiede un modulo AMDGPU recente."
+
+msgid "opt.cpu.pin_cores"
+msgstr "Blocca (pin) i processi di gioco su un insieme specifico di core, impedendo che migrino tra core diversi: migliora la coerenza di prestazioni e cache. Seleziona i core con le caselle; se non ne selezioni nessuno, GameMode rileva automaticamente i core migliori (P-core/E-core su Intel)."
+
+msgid "opt.cpu.park_cores"
+msgstr "Mette offline (park) i core non usati dal gioco: riduce potenza e calore lasciando i core attivi alla massima frequenza (utile su CPU con pochi core veloci). Richiede l'appartenenza al gruppo 'gamemode'. Su CPU con molti core può ridurre la reattività del sistema mentre giochi."
+
+msgid "custom.notifications.title"
+msgstr "Notifiche"
+
+msgid "opt.custom.notify_start.label"
+msgstr "Notifica all'avvio"
+
+msgid "opt.custom.notify_start"
+msgstr "Aggiunge la voce 'notify-send \"GameMode started\"' all'avvio di GameMode: mostra una notifica desktop quando GameMode si attiva. Comoda per capire a colpo d'occhio quando le ottimizzazioni sono attive; richiede un demone di notifiche in esecuzione."
+
+msgid "opt.custom.notify_end.label"
+msgstr "Notifica alla fine"
+
+msgid "opt.custom.notify_end"
+msgstr "Aggiunge la voce 'notify-send \"GameMode ended\"' alla fine di GameMode: mostra una notifica desktop quando GameMode si disattiva."
+
+msgid "opt.custom.start"
+msgstr "Comandi/script eseguiti (tramite /bin/sh) all'avvio di GameMode: una riga = un comando. Usalo per spegnere servizi, impostare variabili o lanciare script personalizzati. Le voci sono eseguite in ordine."
+
+msgid "opt.custom.end"
+msgstr "Comandi/script eseguiti (tramite /bin/sh) alla fine di GameMode: una riga = un comando. Usalo per ripristinare ciò che hai modificato all'avvio."
+
+msgid "opt.custom.script_timeout"
+msgstr "Tempo massimo (in secondi) concesso agli script di avvio/fine: quelli che non terminano entro questo tempo vengono interrotti. Evita che uno script bloccato ritardi l'attivazione o la disattivazione di GameMode."
