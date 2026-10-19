@@ -13,7 +13,10 @@ import os
 import tempfile
 from typing import Dict, List, Optional
 
-from services.privileged import is_privileged_path, run_privileged
+from services.privileged import (
+    COMMAND_COMMIT, COMMAND_ENSURE_ORIG, COMMAND_RESTORE_BACKUP,
+    COMMAND_RESTORE_ORIG, is_privileged_path, run_privileged,
+)
 
 _FILE_MODE = 0o644
 
@@ -249,7 +252,7 @@ class Configuration:
         content = self.render(sections)
         if is_privileged_path(self.config_path):
             self.ensure_orig()
-            result = run_privileged("commit", self.config_path, content=content)
+            result = run_privileged(COMMAND_COMMIT, self.config_path, content=content)
             if not result.success:
                 raise OSError((result.stderr or result.stdout or "unknown error").strip())
         else:
@@ -267,7 +270,7 @@ class Configuration:
             return
         if is_privileged_path(self.config_path):
             try:
-                run_privileged("ensure-orig", self.config_path,
+                run_privileged(COMMAND_ENSURE_ORIG, self.config_path,
                                content=self.orig_seed)
             except Exception:
                 pass
@@ -283,7 +286,7 @@ class Configuration:
         """Restore ``.bak`` -> active file."""
         try:
             if is_privileged_path(self.config_path):
-                return run_privileged("restore-backup", self.config_path).success
+                return run_privileged(COMMAND_RESTORE_BACKUP, self.config_path).success
             restore_from_backup(self.config_path)
             return True
         except OSError:
@@ -293,7 +296,7 @@ class Configuration:
         """Restore ``.orig`` -> active file."""
         try:
             if is_privileged_path(self.config_path):
-                return run_privileged("restore-orig", self.config_path).success
+                return run_privileged(COMMAND_RESTORE_ORIG, self.config_path).success
             restore_from_orig(self.config_path)
             return True
         except OSError:

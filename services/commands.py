@@ -10,6 +10,12 @@ from typing import List, Optional
 
 from i18n.translator import tr
 
+PKEXEC = "pkexec"
+PKEXEC_PATHS = ("/usr/bin/pkexec", "/usr/sbin/pkexec")
+SUDO = "sudo"
+SUDO_PATHS = ("/usr/bin/sudo", "/bin/sudo", "/usr/sbin/sudo")
+SUDO_NONINTERACTIVE = "-n"
+
 
 @dataclass
 class CommandResult:
@@ -61,10 +67,10 @@ def run_command(argv: List[str], timeout: int = 30) -> CommandResult:
 def privileged_prefixes() -> List[List[str]]:
     """Available privileged prefixes, in order (pkexec, then sudo)."""
     prefixes: List[List[str]] = []
-    pkexec = find_executable("pkexec", "/usr/bin/pkexec", "/usr/sbin/pkexec")
+    pkexec = find_executable(PKEXEC, *PKEXEC_PATHS)
     if pkexec:
         prefixes.append([pkexec])
-    sudo = find_executable("sudo", "/usr/bin/sudo", "/bin/sudo", "/usr/sbin/sudo")
+    sudo = find_executable(SUDO, *SUDO_PATHS)
     if sudo:
-        prefixes.append([sudo, "-n"])
+        prefixes.append([sudo, SUDO_NONINTERACTIVE])
     return prefixes

@@ -24,6 +24,7 @@ from i18n.settings import describe_lang_errors, ensure_settings, save_lang
 from i18n.translator import current_lang, tr
 from initializer import App, build_app, reload
 from services.daemon import (
+    GROUP_COMMAND, RESTART_COMMAND, TEST_COMMAND, VERSION_COMMAND,
     add_user_to_group, daemon_version, restart_daemon, test_daemon,
 )
 from ui.widgets.page_header import PageHeader
@@ -317,18 +318,18 @@ class MainWindow(Adw.ApplicationWindow):
     # -- daemon actions ------------------------------------------------------
     def do_restart_daemon(self) -> None:
         """Restart the daemon and show the command + output in the console."""
-        self._show_daemon_result(restart_daemon(),
-                                 "systemctl --user restart gamemoded")
+        self._show_daemon_result(restart_daemon(), RESTART_COMMAND)
 
     def run_daemon_tests(self) -> None:
         """Run the daemon diagnostics and version, showing them in the console."""
-        self._show_daemon_result(test_daemon(), "gamemoded -t")
-        self._show_daemon_result(daemon_version(), "gamemoded --version")
+        self._show_daemon_result(test_daemon(), TEST_COMMAND)
+        self._show_daemon_result(daemon_version(), VERSION_COMMAND)
 
     def do_add_group(self) -> None:
         """Add the current user to the gamemode group and refresh the status."""
         result = add_user_to_group()
-        self._show_daemon_result(result, f"usermod -aG gamemode {getpass.getuser()}")
+        self._show_daemon_result(
+            result, GROUP_COMMAND.format(user=getpass.getuser()))
         if result.success:
             self.pages["daemon"].show_output(tr("dlg.logout.body"))
         self.pages["daemon"].refresh_group()

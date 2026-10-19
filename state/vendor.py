@@ -15,11 +15,9 @@ if _VENDOR not in sys.path:
     sys.path.insert(0, _VENDOR)
 
 from redux import (  # noqa: E402,F401
-    Action, create_action, create_feature_module, create_store, handle_actions,
-    select_feature,
+    create_action, create_feature_module, create_store,
 )
 
 __all__ = [
-    "Action", "create_action", "create_feature_module", "create_store",
-    "handle_actions", "select_feature",
+    "create_action", "create_feature_module", "create_store",
 ]

@@ -8,10 +8,9 @@ from typing import Dict, List
 from sections.core import SectionCore
 from sections.cpu.options import CPU_OPTIONS
 from sections.serialization import (
-    cpu_value, parse_into, render_section, written_nonempty,
+    cpu_value, expand_cpu_list, parse_into, render_section, written_nonempty,
 )
 from spec import OptionSpec
-from utils.cpu import expand_cpu_list
 
 SECTION_ID = "cpu"
 _CPU_ONLINE_FILE = "/sys/devices/system/cpu/online"

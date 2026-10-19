@@ -20,6 +20,7 @@ from sections.custom.core import CustomCore  # noqa: E402
 from sections.general.core import GeneralCore, available_governors  # noqa: E402
 from sections.general.options import GENERAL_OPTIONS  # noqa: E402
 from sections.gpu.core import GpuCore  # noqa: E402
+from services.privileged import COMMAND_COMMIT  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # General: render only active options + roundtrip + kernel governors
@@ -149,7 +150,7 @@ with tempfile.TemporaryDirectory() as work:
     helper = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "services", "privileged_helper.py")
-    process = subprocess.run([sys.executable, helper, "commit", path],
+    process = subprocess.run([sys.executable, helper, COMMAND_COMMIT, path],
                              input=general_text, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
     assert open(path, encoding="utf-8").read() == general_text

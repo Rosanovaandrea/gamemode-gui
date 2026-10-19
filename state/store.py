@@ -5,10 +5,7 @@ from __future__ import annotations
 import copy
 from typing import Callable, Dict, Iterable, Optional
 
-from .actions import (
-    ActionType, INIT_SECTION, LOAD_SECTION, RESET_SECTION, SET_DIRTY,
-    SET_OPTION, dirty_action, init_action,
-)
+from .actions import ActionType, dirty_action, init_action
 from .vendor import create_feature_module, create_store
 
 

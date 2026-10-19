@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from i18n.settings import ensure_settings
 from configuration import Configuration, resolve_base_path, resolve_config_path

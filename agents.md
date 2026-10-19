@@ -18,7 +18,6 @@ testable libraries:
 | `services` | commands, pkexec/sudo, daemon actions, root helper |
 | `sections` | the self-contained `gamemode.ini` sections |
 | `ui` | window, pages and the reusable widget library |
-| `utils` | shared helpers (e.g. cpu-list expansion) |
 | `vendor` | vendored `redux-py` + `Rx` (MIT) |
 
 The top-level modules (`core.py`, `initializer.py`, `configuration.py`, `spec.py`,
@@ -70,7 +69,6 @@ gamemode-gui/
 ├── state/                     Redux store
 ├── sections/                  one folder per section
 ├── ui/                        window + pages/ + widgets/
-├── utils/                     shared helpers
 ├── vendor/                    vendored Redux/Rx
 ├── data/                      style.css, locale/*.po, *.mo, languages.json
 ├── scripts/locales.py         compile/check catalogs

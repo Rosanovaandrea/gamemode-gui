@@ -41,6 +41,12 @@ if _ROOT not in sys.path:
 from configuration import (
     ensure_orig, restore_from_backup, restore_from_orig, write_commit,
 )
+from services.privileged import (
+    COMMAND_COMMIT, COMMAND_ENSURE_ORIG, COMMAND_RESTORE_BACKUP, COMMAND_RESTORE_ORIG,
+)
+
+USAGE = (f"usage: privileged_helper.py <{COMMAND_COMMIT}|{COMMAND_RESTORE_BACKUP}|"
+         f"{COMMAND_RESTORE_ORIG}|{COMMAND_ENSURE_ORIG}> <path> [seed]\n")
 
 
 def _read_seed(path: str | None) -> str | None:
@@ -56,24 +62,23 @@ def _read_seed(path: str | None) -> str | None:
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
-        sys.stderr.write(
-            "usage: privileged.py <commit|restore-backup|restore-orig|ensure-orig> <path> [seed]\n")
+        sys.stderr.write(USAGE)
         return 2
 
     command, target = argv[0], argv[1]
 
     try:
         match command:
-            case "commit":
+            case _ if command == COMMAND_COMMIT:
                 content = sys.stdin.read()
                 seed_path = argv[2] if len(argv) > 2 else None
                 write_commit(target, content,
-                                     orig_seed_content=_read_seed(seed_path))
-            case "restore-backup":
+                             orig_seed_content=_read_seed(seed_path))
+            case _ if command == COMMAND_RESTORE_BACKUP:
                 restore_from_backup(target)
-            case "restore-orig":
+            case _ if command == COMMAND_RESTORE_ORIG:
                 restore_from_orig(target)
-            case "ensure-orig":
+            case _ if command == COMMAND_ENSURE_ORIG:
                 ensure_orig(target, seed_content=sys.stdin.read())
             case _:
                 sys.stderr.write(f"unknown command: {command}\n")

@@ -20,6 +20,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 DEFAULT_LOCALE = os.path.join(ROOT, "data", "locale")
 DOMAIN = "gamemode-gui"
+COMMAND_CONVERT = "convert"
+COMMAND_COMPILE = "compile"
+COMMAND_CHECK = "check"
+MSGFMT = "msgfmt"
 
 
 def _po_escape(text: str) -> str:
@@ -75,7 +79,7 @@ def compile_catalogs(locale_dir: str = DEFAULT_LOCALE) -> None:
         code = name[:-3]
         target = _mo_path(locale_dir, code)
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        subprocess.run(["msgfmt", "--check", "-o", target,
+        subprocess.run([MSGFMT, "--check", "-o", target,
                         os.path.join(locale_dir, name)], check=True)
 
 
@@ -88,7 +92,7 @@ def check(locale_dir: str = DEFAULT_LOCALE) -> int:
         with tempfile.NamedTemporaryFile(suffix=".mo", delete=False) as handle:
             generated = handle.name
         try:
-            result = subprocess.run(["msgfmt", "--check", "-o", generated, source])
+            result = subprocess.run([MSGFMT, "--check", "-o", generated, source])
             if result.returncode != 0:
                 failed += 1
             elif not os.path.isfile(target):
@@ -103,14 +107,14 @@ def check(locale_dir: str = DEFAULT_LOCALE) -> int:
 
 
 def main(argv: list[str]) -> int:
-    command = argv[1] if len(argv) > 1 else "check"
+    command = argv[1] if len(argv) > 1 else COMMAND_CHECK
     args = argv[2:]
     match command:
-        case "convert":
+        case _ if command == COMMAND_CONVERT:
             convert(*args)
-        case "compile":
+        case _ if command == COMMAND_COMPILE:
             compile_catalogs(*args)
-        case "check":
+        case _ if command == COMMAND_CHECK:
             return check(*args)
         case _:
             print(__doc__)

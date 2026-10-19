@@ -9,12 +9,17 @@ from typing import List, Optional
 
 from .commands import CommandResult, privileged_prefixes
 
+HELPER_SCRIPT = "privileged_helper.py"
+COMMAND_COMMIT = "commit"
+COMMAND_RESTORE_BACKUP = "restore-backup"
+COMMAND_RESTORE_ORIG = "restore-orig"
+COMMAND_ENSURE_ORIG = "ensure-orig"
+
 
 def run_privileged(command: str, path: str, content: str = "", timeout: int = 60,
                    extra_args: Optional[List[str]] = None) -> CommandResult:
     """Run the root helper, trying pkexec then sudo."""
-    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          "privileged_helper.py")
+    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), HELPER_SCRIPT)
     helper_argv = [sys.executable, helper, command, path] + list(extra_args or [])
     for prefix in privileged_prefixes():
         try:

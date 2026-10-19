@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 from configuration import Configuration
-from i18n.settings import available_langs, save_lang
-from i18n.translator import current_lang
+from i18n.settings import available_langs
 
 
 class AppCore:
@@ -41,11 +40,3 @@ class AppCore:
     def language_menu(self) -> List[Tuple[str, str]]:
         """``(code, name)`` pairs for the language menu."""
         return available_langs()
-
-    def active_language(self) -> str:
-        """Code of the currently active language."""
-        return current_lang()
-
-    def choose_language(self, code: str) -> None:
-        """Persist a new language choice (applied on the next start)."""
-        save_lang(code)
