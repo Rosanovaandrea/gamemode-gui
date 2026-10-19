@@ -134,12 +134,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.core.store.subscribe(self._on_store_state)
 
         self._build_ui()
-        self._warn_language_errors()
-
-    def _section_core(self, section_id: str):
-        """The section core registered under ``section_id``."""
-        return next(section for section in self.core.sections
-                    if section.section_id == section_id)
+        for message in i18n.describe_lang_errors():
+            self.toast_overlay.add_toast(Adw.Toast(title=message))
 
     def _static_page(self, section_id: str):
         """Build a stateless section page (no state/initializer), by convention."""
@@ -181,7 +177,10 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar.add_bottom_bar(self._build_action_bar())
         help_button = Gtk.Button(icon_name="help-about-symbolic")
         help_button.set_tooltip_text(tr("header.help.tooltip"))
-        help_button.connect("clicked", lambda *_: self._show_help())
+        help_button.connect(
+            "clicked",
+            lambda *_: info_dialog(self, tr("dlg.help.title"),
+                                   tr("dlg.help.body")).present())
         header.pack_end(help_button)
         header.pack_end(self._build_language_button())
 
@@ -199,7 +198,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         for section_id, (_core_class, _initializer) in SECTION_MODULES.items():
             ui_module = importlib.import_module(f"sections.{section_id}.ui")
-            page = ui_module.build_page(self._section_core(section_id))
+            section_core = next(section for section in self.core.sections
+                                if section.section_id == section_id)
+            page = ui_module.build_page(section_core)
             self.pages[section_id] = page
             self.stack.add_titled(page, section_id, tr(ui_module.TAB_TITLE_ID))
 
@@ -242,18 +243,10 @@ class MainWindow(Adw.ApplicationWindow):
         button.set_menu_model(menu)
         return button
 
-    def notify_language_restart(self) -> None:
-        """Tell the user the new language applies on the next start."""
-        info_dialog(self, tr("dlg.lang.title"), tr("dlg.lang.body")).present()
-
     # -- dirty tracking ------------------------------------------------------
     def _on_store_state(self, root: dict) -> None:
         """Sync the dirty flag and refresh the dependent-option gating."""
         self._dirty = bool(root.get("dirty", False))
-        self._refresh_gating()
-
-    def _refresh_gating(self) -> None:
-        """Ask every page that supports it to re-evaluate its option gating."""
         for page in self.pages.values():
             if hasattr(page, "refresh_gating"):
                 page.refresh_gating()
@@ -350,14 +343,6 @@ class MainWindow(Adw.ApplicationWindow):
         page.show_command(result.command or fallback_command)
         page.show_output(result.output)
 
-    def _show_help(self) -> None:
-        info_dialog(self, tr("dlg.help.title"), tr("dlg.help.body")).present()
-
-    def _warn_language_errors(self) -> None:
-        """Show a toast for every language-configuration error (non-blocking)."""
-        for message in i18n.describe_lang_errors():
-            self.toast_overlay.add_toast(Adw.Toast(title=message))
-
 
 # --- application ------------------------------------------------------------
 
@@ -368,9 +353,6 @@ class Application(Adw.Application):
         super().__init__(application_id="io.github.gamemodegui.GameModeGui",
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
         self._window: Optional[MainWindow] = None
-        self._install_actions()
-
-    def _install_actions(self) -> None:
         action = Gio.SimpleAction.new_stateful(
             "set-lang", GLib.VariantType.new("s"),
             GLib.Variant.new_string(i18n.current_lang()))
@@ -384,7 +366,8 @@ class Application(Adw.Application):
         action.set_state(value)
         i18n.save_lang(code)  # the saved choice takes precedence over everything
         if self._window is not None:
-            self._window.notify_language_restart()
+            info_dialog(self._window, tr("dlg.lang.title"),
+                        tr("dlg.lang.body")).present()
 
     def do_activate(self) -> None:
         i18n.ensure_settings()

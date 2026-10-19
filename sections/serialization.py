@@ -13,14 +13,8 @@ RenderValue = Callable[[OptionSpec, object], object]
 
 def written_default(option_spec: OptionSpec, value) -> bool:
     """Write changed booleans, and non-empty values that differ from the default."""
-    match option_spec.type:
-        case "bool":
-            return bool(value) != bool(option_spec.default)
-        case _:
-            return _written_scalar(option_spec, value)
-
-
-def _written_scalar(option_spec: OptionSpec, value) -> bool:
+    if option_spec.type == "bool":
+        return bool(value) != bool(option_spec.default)
     if value is None or str(value) == "":
         return False
     return str(value) != str(option_spec.default)
@@ -72,19 +66,15 @@ def render_section(core, written: Written = written_default,
     return f"[{core.section_id}]\n" + "\n".join(lines) + "\n" if lines else ""
 
 
-def _raw_value(option_spec: OptionSpec, values: List[str]) -> str:
-    match option_spec.type:
-        case "int" | "float" | "bool":
-            return values[-1]
-        case "cores" | "list":
-            return ",".join(values)
-        case _:
-            return values[-1] if len(values) == 1 else ",".join(values)
-
-
 def parse_value(option_spec: OptionSpec, values: List[str]):
     """Convert raw INI values to the option's Python type (or ``None``)."""
-    raw = _raw_value(option_spec, values)
+    match option_spec.type:
+        case "int" | "float" | "bool":
+            raw = values[-1]
+        case "cores" | "list":
+            raw = ",".join(values)
+        case _:
+            raw = values[-1] if len(values) == 1 else ",".join(values)
     try:
         match option_spec.type:
             case "int":

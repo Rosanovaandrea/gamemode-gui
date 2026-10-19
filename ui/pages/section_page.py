@@ -75,12 +75,11 @@ class SectionPage(Gtk.Box):
     def _make_row(self, spec) -> OptionRow:
         row = OptionRow(spec, choices=self.core.allowed_values_for(spec))
         self._populate_row(row)
-        row.connect_changed(lambda _key, current=row: self._on_row_change(current))
+        row.connect_changed(
+            lambda _key, current=row: getattr(
+                self.core, f"set_{current.spec.key}")(current.get_value()))
         self.rows.append(row)
         return row
-
-    def _on_row_change(self, row: OptionRow) -> None:
-        getattr(self.core, f"set_{row.spec.key}")(row.get_value())
 
     def _populate_row(self, row: OptionRow) -> None:
         row._suppress = True

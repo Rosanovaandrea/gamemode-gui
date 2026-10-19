@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from sections.core import SectionCore
 from sections.custom.options import CUSTOM_OPTIONS
@@ -24,11 +24,6 @@ class CustomCore(SectionCore):
 
     section_id = SECTION_ID
     options = CUSTOM_OPTIONS
-
-    # -- option lookup -------------------------------------------------------
-    def _option(self, key: str) -> Optional[OptionSpec]:
-        """Return the option descriptor with ``key``, if it exists."""
-        return next((spec for spec in self.options if spec.key == key), None)
 
     # -- effective values ----------------------------------------------------
     def _effective_list_value(self, list_spec: OptionSpec) -> List[str]:
@@ -111,7 +106,10 @@ class CustomCore(SectionCore):
                     case "toggle_entry":
                         self._set_option(option_spec.key, True)
                     case "int":
-                        self._apply_int(option_spec, raw_values)
+                        try:
+                            self._set_option(option_spec.key, int(raw_values[-1]))
+                        except ValueError:
+                            pass
                     case _:
                         self._set_option(option_spec.key, raw_values[-1])
         self._extract_toggle_entries_from_lists()
@@ -125,17 +123,14 @@ class CustomCore(SectionCore):
                             *parsed_items]
         self._set_option(option_spec.key, parsed_items)
 
-    def _apply_int(self, option_spec: OptionSpec, raw_values: List[str]) -> None:
-        """Store an integer value, ignoring invalid input."""
-        try:
-            self._set_option(option_spec.key, int(raw_values[-1]))
-        except ValueError:
-            pass
-
     def _extract_toggle_entries_from_lists(self) -> None:
         """Turn a managed string found in a list into its switch and drop it."""
         for toggle_spec in self.options:
-            target_spec = self._option(toggle_spec.target) if toggle_spec.target else None
+            target_spec = (
+                next((spec for spec in self.options
+                      if spec.key == toggle_spec.target), None)
+                if toggle_spec.target else None
+            )
             target_items = (
                 getattr(self.state, target_spec.key)
                 if target_spec is not None and target_spec.type == "list"

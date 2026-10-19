@@ -47,15 +47,11 @@ class SectionCore:
         self.store = store or AppStore({self.section_id: self._defaults})
         self.store.ensure_section(self.section_id, self._defaults)
         self.state = SectionState(self)
-        self._install_option_accessors()
-
-    # -- speaking accessors, one per option ----------------------------------
-    def _install_option_accessors(self) -> None:
-        """Create a speaking ``get_<key>`` and ``set_<key>`` for every option."""
         for option in self.options:
             setattr(self, f"get_{option.key}", self._make_option_getter(option.key))
             setattr(self, f"set_{option.key}", self._make_option_setter(option.key))
 
+    # -- speaking accessors, one per option ----------------------------------
     def _make_option_getter(self, option_key: str):
         def get_option_value():
             return self._get_option(option_key)
