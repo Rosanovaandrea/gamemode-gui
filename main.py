@@ -7,7 +7,7 @@ import sys
 
 
 def main() -> int:
-    from gamemode_gui.ui.window import run
+    from ui.window import run
     return run(sys.argv)
 
 

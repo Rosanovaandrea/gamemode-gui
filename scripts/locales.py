@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-DEFAULT_LOCALE = os.path.join(ROOT, "gamemode_gui", "data", "locale")
+DEFAULT_LOCALE = os.path.join(ROOT, "data", "locale")
 DOMAIN = "gamemode-gui"
 
 

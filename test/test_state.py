@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gamemode_gui.state import (  # noqa: E402
+from state import (  # noqa: E402
     AppStore, load_action, option_action, reset_section, section_defaults,
 )
 

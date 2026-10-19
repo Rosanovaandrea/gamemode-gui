@@ -1,4 +1,4 @@
 PyGObject>=3.42
 
-# Redux (redux-py) and Rx are vendored under gamemode_gui/vendor/ so the
-# application has no mandatory pip dependencies beyond PyGObject.
+# Redux (redux-py) and Rx are vendored under vendor/ so the application has no
+# mandatory pip dependencies beyond PyGObject.

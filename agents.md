@@ -2,32 +2,32 @@
 
 A GTK4 + Libadwaita (Python 3) desktop app to manage the `gamemode.ini`
 configuration of the **Feral GameMode** daemon. All code, comments and docs are in
-English; only the translation data (`gamemode_gui/data/locale/*.po`) and the
+English; only the translation data (`data/locale/*.po`) and the
 desktop entry's localised fields are in other languages.
 
 ## Internal libraries
 
-The application is an installable package (`gamemode_gui/`) made of small,
+The application lives directly in the `gamemode-gui/` folder as a set of small,
 testable libraries:
 
 | Package | Responsibility |
 | --- | --- |
-| `gamemode_gui.i18n` | gettext catalogs, language detection and `settings.json` |
-| `gamemode_gui.state` | Redux actions/reducers/store and selectors |
-| `gamemode_gui.config` | paths, INI slices, session sidecar, atomic fileops |
-| `gamemode_gui.services` | commands, pkexec/sudo, daemon actions, root helper |
-| `gamemode_gui.sections` | the self-contained `gamemode.ini` sections |
-| `gamemode_gui.ui` | window, pages and the reusable widget library |
-| `gamemode_gui.utils` | shared helpers (e.g. cpu-list expansion) |
-| `gamemode_gui.vendor` | vendored `redux-py` + `Rx` (MIT) |
+| `i18n` | gettext catalogs, language detection and `settings.json` |
+| `state` | Redux actions/reducers/store and selectors |
+| `config` | paths, INI slices, session sidecar, atomic fileops |
+| `services` | commands, pkexec/sudo, daemon actions, root helper |
+| `sections` | the self-contained `gamemode.ini` sections |
+| `ui` | window, pages and the reusable widget library |
+| `utils` | shared helpers (e.g. cpu-list expansion) |
+| `vendor` | vendored `redux-py` + `Rx` (MIT) |
 
-Root modules (`i18n.py`, `widgets.py`, `core.py`, ...) are compatibility shims;
-new code imports from `gamemode_gui`.
+The top-level modules (`core.py`, `initializer.py`, `spec.py`, `main.py`) are the
+entry points; new code imports the libraries above directly.
 
 ## State flow
 
 Each stateful section declares `section_id` and `options` and extends
-`gamemode_gui.sections.core.SectionCore`. The core is a facade over the shared
+`sections.core.SectionCore`. The core is a facade over the shared
 `AppStore`:
 
 - speaking `get_<key>()` / `set_<key>()` accessors stay available;
@@ -42,7 +42,7 @@ the sections and clears the dirty flag.
 
 ## i18n
 
-`gamemode_gui.i18n.tr(key)` reads the gettext catalog for the active language.
+`i18n.tr(key)` reads the gettext catalog for the active language.
 Catalogs are `data/locale/<code>.po` compiled to
 `data/locale/<code>/LC_MESSAGES/gamemode-gui.mo`; `languages.json` holds the human
 language names. The effective language is saved choice > system locale
@@ -51,9 +51,9 @@ Use `scripts/locales.py compile|check` after editing a `.po` file.
 
 ## UI
 
-`gamemode_gui.ui.pages.SectionPage` builds the common page (header, optional
+`ui.pages.SectionPage` builds the common page (header, optional
 banner/card, rows, refresh and dependency gating). Section views are tiny
-configurations of it. Controls live in `gamemode_gui.ui.widgets` and are selected
+configurations of it. Controls live in `ui.widgets` and are selected
 by an option-type registry (`factory.py`), so adding a new type is one builder.
 
 ## Layout
@@ -62,20 +62,19 @@ by an option-type registry (`factory.py`), so adding a new type is one builder.
 gamemode-gui/
 ├── main.py                    entry point (`python3 main.py`)
 ├── pyproject.toml             package metadata + console script
+├── core.py                    AppCore + ConfigManager
+├── initializer.py             build/reload the application
+├── spec.py                    OptionSpec
 ├── privileged.py              compatibility shim for the root helper
-├── gamemode_gui/
-│   ├── core.py                AppCore + ConfigManager
-│   ├── initializer.py         build/reload the application
-│   ├── spec.py                OptionSpec
-│   ├── config/                paths, ini, session, fileops
-│   ├── services/              commands, privileged, daemon, helper
-│   ├── i18n/                  gettext + settings
-│   ├── state/                 Redux store
-│   ├── sections/              one folder per section
-│   ├── ui/                    window + pages/ + widgets/
-│   ├── utils/                 shared helpers
-│   ├── vendor/                vendored Redux/Rx
-│   └── data/                  style.css, locale/*.po, *.mo, languages.json
+├── config/                    paths, ini, session, fileops
+├── services/                  commands, privileged, daemon, helper
+├── i18n/                      gettext + settings
+├── state/                     Redux store
+├── sections/                  one folder per section
+├── ui/                        window + pages/ + widgets/
+├── utils/                     shared helpers
+├── vendor/                    vendored Redux/Rx
+├── data/                      style.css, locale/*.po, *.mo, languages.json
 ├── scripts/locales.py         compile/check catalogs
 └── test/                      headless tests + smoke test
 ```
@@ -85,7 +84,7 @@ gamemode-gui/
 - Comments and docstrings in **English**.
 - Prefer speaking names; keep helpers concise.
 - Every visible string goes through `tr("key")`.
-- GTK is used only in `gamemode_gui.ui` and the section `ui.py` files; cores and
+- GTK is used only in `ui` and the section `ui.py` files; cores and
   services stay headless and testable without a display.
 - Reducers stay pure; side effects belong to services or `AppCore`.
 
@@ -102,8 +101,8 @@ python3 test/smoke_test.py         # real window (needs DISPLAY)
 ## Packaging
 
 `packaging/build.sh` builds the `.deb` and `.rpm` into `dist/` (pure Python/GTK).
-It installs `main.py` and the whole `gamemode_gui/` package, including the
-compiled `.mo` catalogs and the vendored Redux libraries. CI
+It installs `main.py`, the top-level modules and the internal libraries, including
+the compiled `.mo` catalogs and the vendored Redux libraries. CI
 (`.github/workflows/build-packages.yml`) runs the headless tests before building.
 
 ## Caveats
