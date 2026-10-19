@@ -1,35 +1,15 @@
 /* GameMode GUI application style.
  *
  * Loaded by the general window at APPLICATION priority, so it can override the
- * theme style. The @accent_* colours come from the system theme.
- *
- * Layout margins live here instead of in the widget constructors.
+ * theme style.
  */
 
-/* Page and card spacing. */
 .page-wrapper {
   margin: 12px 16px;
 }
 
-.section-card,
 .daemon-card {
   margin: 4px;
-}
-
-.section-card-title {
-  margin: 8px 12px 4px 12px;
-}
-
-.presentation-content {
-  margin: 4px 0;
-}
-
-.presentation-warning {
-  margin: 12px;
-}
-
-.option-row {
-  margin: 8px 12px;
 }
 
 /* Monospaced, read-only text views. */
@@ -42,17 +22,4 @@
   background-color: #16181d;
   color: #e6e6e6;
   font-family: monospace;
-}
-
-/* Active option: the selected choice in radio groups, with accent background
- * and light text (GNOME "segmented" style). */
-.choice-button:checked {
-  background-color: @accent_bg_color;
-  background-image: none;
-  color: @accent_fg_color;
-}
-
-/* "+" and "−" texts of the numeric steppers in the accent colour. */
-.stepper-button {
-  color: @accent_color;
 }

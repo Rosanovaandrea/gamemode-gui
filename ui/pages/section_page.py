@@ -1,4 +1,4 @@
-"""Generic section page: header, optional card/banner and editable rows."""
+"""Section page built with standard Libadwaita preferences widgets."""
 
 from __future__ import annotations
 
@@ -11,20 +11,18 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
 
 from i18n.translator import tr
-from ui.widgets.option_row import OptionRow
-from ui.widgets.page_header import PageHeader
+from ui.widgets.option_row import OptionRow, build_row
 
 
 class SectionPage(Gtk.Box):
-    """Page built from a section core's options."""
+    """One preferences page generated from a section core's options."""
 
     def __init__(self, core, title_id: str, subtitle_id: str, *,
                  banner_id: Optional[str] = None,
                  card_title_id: Optional[str] = None,
                  card_types: Iterable[str] = (),
                  exclude_types: Iterable[str] = ()) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.add_css_class("section-page")
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.core = core
         self.rows: List[OptionRow] = []
         self._card_types = tuple(card_types)
@@ -34,44 +32,37 @@ class SectionPage(Gtk.Box):
             banner = Adw.Banner(title=tr(banner_id))
             banner.add_css_class("error")
             self.append(banner)
-        self.append(PageHeader(title_id, subtitle_id))
+
+        page = Adw.PreferencesPage()
+        page.set_vexpand(True)
         if self._card_types and card_title_id:
-            self.append(self._card(card_title_id))
-        self.append(self._option_list())
+            page.add(self._group(tr(card_title_id), self._card_types))
+        page.add(self._group(tr(title_id), None, tr(subtitle_id),
+                             self._exclude_types))
+        self.append(page)
         self.refresh_gating()
 
-    def _card(self, title_id: str) -> Gtk.Widget:
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        card.add_css_class("card")
-        card.add_css_class("section-card")
-        title = Gtk.Label(label=tr(title_id), xalign=0.0, css_classes=["heading",
-                                                                       "section-card-title"])
-        card.append(title)
-        listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+    def _group(self, title: str, included_types, description: str = "",
+               excluded_types: Iterable[str] = ()) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(title=title, description=description)
         for spec in self.core.options:
-            if spec.type in self._card_types:
-                listbox.append(self._make_row(spec))
-        card.append(listbox)
-        return card
-
-    def _option_list(self) -> Gtk.Widget:
-        scroller = Gtk.ScrolledWindow(vexpand=True)
-        listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-        listbox.add_css_class("boxed-list")
-        for spec in self.core.options:
-            if spec.type not in self._card_types and spec.type not in self._exclude_types:
-                listbox.append(self._make_row(spec))
-        scroller.set_child(listbox)
-        return scroller
+            if included_types is not None and spec.type not in included_types:
+                continue
+            if spec.type in excluded_types:
+                continue
+            group.add(self._make_row(spec).widget)
+        return group
 
     def _make_row(self, spec) -> OptionRow:
-        row = OptionRow(spec, choices=self.core.allowed_values_for(spec))
+        row = build_row(spec, self._on_row_change,
+                        choices=self.core.allowed_values_for(spec))
         self._populate_row(row)
-        row.connect_changed(
-            lambda _key, current=row: getattr(
-                self.core, f"set_{current.spec.key}")(current.get_value()))
         self.rows.append(row)
         return row
+
+    def _on_row_change(self, key: str) -> None:
+        row = next(row for row in self.rows if row.spec.key == key)
+        getattr(self.core, f"set_{key}")(row.get_value())
 
     def _populate_row(self, row: OptionRow) -> None:
         row._suppress = True

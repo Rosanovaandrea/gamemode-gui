@@ -1,64 +1,36 @@
-"""View of the Presentation section (stateless, data-driven).
-
-Shows the blocks loaded by :mod:`sections.presentation.core`; a
-block marked as a warning is rendered as a card with a warning icon.
-"""
+"""View of the Presentation section (stateless, data-driven)."""
 
 from __future__ import annotations
 
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk
 
 from i18n.translator import tr
 from sections.presentation import core
-from ui.widgets.page_header import PageHeader
 
 
-class PresentationPage(Gtk.Box):
+class PresentationPage(Adw.PreferencesPage):
     """Introductory page: what GameMode is, how to use it, warnings."""
 
     def __init__(self) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.add_css_class("presentation-page")
+        super().__init__()
         presentation = core.PRESENTATION
-        self.append(PageHeader(presentation.title_id, presentation.subtitle_id))
-
-        scroller = Gtk.ScrolledWindow(vexpand=True)
-        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        content.add_css_class("presentation-content")
+        self.add(Adw.PreferencesGroup(
+            title=tr(presentation.title_id),
+            description=tr(presentation.subtitle_id),
+        ))
         for block in presentation.blocks:
-            content.append(_presentation_block(block))
-        scroller.set_child(content)
-        self.append(scroller)
-
-
-def _presentation_block(block) -> Gtk.Widget:
-    """A Presentation block: heading + body, card with icon if a warning."""
-    heading = Gtk.Label(label=tr(block.heading_id), xalign=0.0, wrap=True,
-                        css_classes=["heading"])
-    body = Gtk.Label(label=tr(block.body_id), xalign=0.0, wrap=True, selectable=True)
-
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    if not block.warning:
-        box.append(heading)
-        box.append(body)
-        return box
-
-    box.add_css_class("card")
-    inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-    inner.add_css_class("presentation-warning")
-    icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
-    icon.set_valign(Gtk.Align.START)
-    text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    text.set_hexpand(True)
-    text.append(heading)
-    text.append(body)
-    inner.append(icon)
-    inner.append(text)
-    box.append(inner)
-    return box
+            group = Adw.PreferencesGroup(
+                title=tr(block.heading_id),
+                description=tr(block.body_id),
+            )
+            if block.warning:
+                group.set_header_suffix(
+                    Gtk.Image.new_from_icon_name("dialog-warning-symbolic"))
+            self.add(group)
 
 
 def build_page(window):

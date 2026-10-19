@@ -48,10 +48,11 @@ Use `scripts/locales.py compile|check` after editing a `.po` file.
 
 ## UI
 
-`ui.pages.SectionPage` builds the common page (header, optional
-banner/card, rows, refresh and dependency gating). Section views are tiny
-configurations of it. Controls live in `ui.widgets` and are selected
-by an option-type registry (`factory.py`), so adding a new type is one builder.
+`ui.pages.SectionPage` builds one `Adw.PreferencesPage` with
+`Adw.PreferencesGroup`s; section views are tiny configurations of it. Each option
+is a standard Libadwaita row (`Adw.SwitchRow`, `Adw.SpinRow`, `Adw.ComboRow`,
+`Adw.ExpanderRow`) built by `ui.widgets.option_row`. Only the list and CPU-core
+editors are custom controls.
 
 ## Layout
 

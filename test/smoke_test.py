@@ -69,7 +69,8 @@ def exercise(*_):
 
     # Kernel-derived choices must be populated (governors / CPU cores).
     governor_row = next(row for row in general.rows if row.spec.key == "desiredgov")
-    results.append(("governors_populated", len(governor_row._input._buttons) > 0))
+    results.append(("governors_populated",
+                    governor_row._input.get_model().get_n_items() > 0))
     cpu_page = window.pages["cpu"]
     pin_row = next(row for row in cpu_page.rows if row.spec.key == "pin_cores")
     results.append(("cores_populated", len(pin_row._input._checks) > 0))

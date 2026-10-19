@@ -9,8 +9,8 @@ of the GUI, and ends with a disclaimer. It holds no state and has no initializer
 - `core.py` — loads `presentation.json` (next to it) into `Presentation` /
   `PresentationBlock` objects: which blocks exist, in what order, and which are
   warnings. A missing/broken file yields an empty presentation.
-- `ui.py` — `PresentationPage` renders the blocks; a warning block becomes a card
-  with a warning icon.
+- `ui.py` — `PresentationPage` renders the blocks as `Adw.PreferencesGroup`s;
+  a warning block gets a warning icon in its header.
 - `presentation.json` — the block **structure** (introduction + per-section guide);
   the **texts** live in the language files.
 
