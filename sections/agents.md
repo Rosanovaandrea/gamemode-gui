@@ -27,7 +27,7 @@ The app is a set of independent **sections**, one folder each under
 | `cpu/` | `[cpu]` | options + core + ui |
 | `custom/` | `[custom]` | options + core + ui |
 | `presentation/` | — (view only) | core + ui + `presentation.json` |
-| `daemon/` | — (utilities) | core (service re-exports) + ui |
+| `daemon/` | — (utilities) | ui (+ `services/`) |
 
 - **Stateful** sections split their code into `options.py` (option descriptors),
   `core.py` (state/render/read rules) and `ui.py` (the page, usually a small

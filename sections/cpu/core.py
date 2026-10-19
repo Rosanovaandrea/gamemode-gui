@@ -11,7 +11,7 @@ from sections.serialization import (
     cpu_value, parse_into, render_section, written_nonempty,
 )
 from spec import OptionSpec
-from utils import expand_cpu_list
+from utils.cpu import expand_cpu_list
 
 SECTION_ID = "cpu"
 _CPU_ONLINE_FILE = "/sys/devices/system/cpu/online"

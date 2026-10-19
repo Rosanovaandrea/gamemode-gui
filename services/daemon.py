@@ -6,7 +6,7 @@ import getpass
 import grp
 from typing import Optional
 
-from i18n import tr
+from i18n.translator import tr
 
 from .commands import CommandResult, find_executable, privileged_prefixes, run_command
 

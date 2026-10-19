@@ -20,11 +20,13 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-import i18n, initializer
-from i18n import tr
-from initializer import App
-from sections.daemon import core as daemon
-from ui.widgets import PageHeader
+from i18n.settings import describe_lang_errors, ensure_settings, save_lang
+from i18n.translator import current_lang, tr
+from initializer import App, build_app, reload
+from services.daemon import (
+    add_user_to_group, daemon_version, restart_daemon, test_daemon,
+)
+from ui.widgets.page_header import PageHeader
 
 # The application stylesheet is owned by the general window.
 _STYLE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -131,7 +133,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.core.store.subscribe(self._on_store_state)
 
         self._build_ui()
-        for message in i18n.describe_lang_errors():
+        for message in describe_lang_errors():
             self.toast_overlay.add_toast(Adw.Toast(title=message))
 
     def _static_page(self, section_id: str):
@@ -304,7 +306,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response != tr(confirm_id):
             return
         if restore():
-            initializer.reload(self.state)
+            reload(self.state)
             self._refresh_all()
             self._dirty = False
             self.toast_overlay.add_toast(Adw.Toast(title=tr(f"{prefix}.ok")))
@@ -315,17 +317,17 @@ class MainWindow(Adw.ApplicationWindow):
     # -- daemon actions ------------------------------------------------------
     def do_restart_daemon(self) -> None:
         """Restart the daemon and show the command + output in the console."""
-        self._show_daemon_result(daemon.restart_daemon(),
+        self._show_daemon_result(restart_daemon(),
                                  "systemctl --user restart gamemoded")
 
     def run_daemon_tests(self) -> None:
         """Run the daemon diagnostics and version, showing them in the console."""
-        self._show_daemon_result(daemon.test_daemon(), "gamemoded -t")
-        self._show_daemon_result(daemon.daemon_version(), "gamemoded --version")
+        self._show_daemon_result(test_daemon(), "gamemoded -t")
+        self._show_daemon_result(daemon_version(), "gamemoded --version")
 
     def do_add_group(self) -> None:
         """Add the current user to the gamemode group and refresh the status."""
-        result = daemon.add_user_to_group()
+        result = add_user_to_group()
         self._show_daemon_result(result, f"usermod -aG gamemode {getpass.getuser()}")
         if result.success:
             self.pages["daemon"].show_output(tr("dlg.logout.body"))
@@ -348,7 +350,7 @@ class Application(Adw.Application):
         self._window: Optional[MainWindow] = None
         action = Gio.SimpleAction.new_stateful(
             "set-lang", GLib.VariantType.new("s"),
-            GLib.Variant.new_string(i18n.current_lang()))
+            GLib.Variant.new_string(current_lang()))
         action.connect("change-state", self._on_set_lang)
         self.add_action(action)
 
@@ -357,15 +359,15 @@ class Application(Adw.Application):
         if code == action.get_state().get_string():
             return
         action.set_state(value)
-        i18n.save_lang(code)  # the saved choice takes precedence over everything
+        save_lang(code)  # the saved choice takes precedence over everything
         if self._window is not None:
             info_dialog(self._window, tr("dlg.lang.title"),
                         tr("dlg.lang.body")).present()
 
     def do_activate(self) -> None:
-        i18n.ensure_settings()
+        ensure_settings()
         if self._window is None:
-            self._window = MainWindow(initializer.build_app(), application=self)
+            self._window = MainWindow(build_app(), application=self)
         self._window.present()
 
 

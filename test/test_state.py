@@ -5,8 +5,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from state import (  # noqa: E402
-    AppStore, load_action, option_action, reset_section, section_defaults,
+from state.store import AppStore, section_defaults  # noqa: E402
+from state.actions import (  # noqa: E402
+    load_action, option_action, reset_section,
 )
 
 defaults = {"demo": section_defaults([

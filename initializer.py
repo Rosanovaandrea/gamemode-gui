@@ -5,14 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 
-import i18n
+from i18n.settings import ensure_settings
 from configuration import Configuration, resolve_base_path, resolve_config_path
 from core import AppCore
 from sections.cpu.core import CpuCore
 from sections.custom.core import CustomCore
 from sections.general.core import GeneralCore
 from sections.gpu.core import GpuCore
-from state import AppStore
+from state.store import AppStore
 
 # The order is the tab order.
 SECTION_CLASSES = (GeneralCore, GpuCore, CpuCore, CustomCore)
@@ -37,7 +37,7 @@ def build_app(config_path: Optional[str] = None) -> App:
     app_core = AppCore(configuration, sections, store)
     configuration.ensure_orig()
     store.set_dirty(False)
-    i18n.ensure_settings()
+    ensure_settings()
     return App(core=app_core, config_path=config_path,
                base_path=app_core.base_path)
 

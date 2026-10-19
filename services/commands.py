@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import List, Optional
 
-from i18n import tr
+from i18n.translator import tr
 
 
 @dataclass

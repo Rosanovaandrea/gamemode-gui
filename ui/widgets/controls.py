@@ -9,8 +9,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
-from i18n import tr
-from utils import expand_cpu_list
+from i18n.translator import tr
+from utils.cpu import expand_cpu_list
 
 
 class ChoicePicker(Gtk.Box):

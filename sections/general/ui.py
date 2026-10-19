@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ui.pages import SectionPage
+from ui.pages.section_page import SectionPage
 
 TAB_TITLE_ID = "tab.general"
 TITLE_ID = "step.general.title"

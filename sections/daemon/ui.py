@@ -12,9 +12,9 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
-from i18n import tr
-from sections.daemon import core
-from ui.widgets import PageHeader
+from i18n.translator import tr
+from services.daemon import group_exists, user_in_group
+from ui.widgets.page_header import PageHeader
 
 
 class DaemonPage(Gtk.Box):
@@ -114,10 +114,10 @@ class DaemonPage(Gtk.Box):
 
     def refresh_group(self) -> None:
         """Update the gamemode group status and the join button."""
-        if not core.group_exists():
+        if not group_exists():
             self.add_group_button.set_sensitive(False)
             self.group_status.set_text(tr("step.restart.group_missing"))
-        elif core.user_in_group():
+        elif user_in_group():
             self.add_group_button.set_sensitive(False)
             self.group_status.set_text(tr("step.restart.group_in"))
         else:

@@ -9,9 +9,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from state import (
-    AppStore, load_action, option_action, reset_section, section_defaults,
-)
+from state.store import AppStore, section_defaults
+from state.actions import load_action, option_action, reset_section
 from configuration import extract_section
 from spec import OptionSpec
 

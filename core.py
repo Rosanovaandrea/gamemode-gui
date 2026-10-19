@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import List, Tuple
 
 from configuration import Configuration
-from i18n import available_langs, current_lang, save_lang
+from i18n.settings import available_langs, save_lang
+from i18n.translator import current_lang
 
 
 class AppCore:

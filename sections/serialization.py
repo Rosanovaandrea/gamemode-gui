@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional
 
 from spec import OptionSpec
-from utils import expand_cpu_list
+from utils.cpu import expand_cpu_list
 
 Written = Callable[[OptionSpec, object], bool]
 RenderValue = Callable[[OptionSpec, object], object]

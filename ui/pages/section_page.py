@@ -10,8 +10,9 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk
 
-from i18n import tr
-from ui.widgets import OptionRow, PageHeader
+from i18n.translator import tr
+from ui.widgets.option_row import OptionRow
+from ui.widgets.page_header import PageHeader
 
 
 class SectionPage(Gtk.Box):
