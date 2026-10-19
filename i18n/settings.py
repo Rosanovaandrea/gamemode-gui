@@ -53,21 +53,19 @@ def _compute_supported_languages() -> None:
         errors.append(("bad_config", ""))
 
     configured: Optional[List[str]] = None
-    if raw_languages is None:
-        configured = None
-    elif isinstance(raw_languages, list):
-        configured = []
-        for item in raw_languages:
-            if not isinstance(item, str):
-                errors.append(("bad_entry", str(item)))
-                continue
-            code = normalize_lang_code(item)
-            if code is None:
-                errors.append(("bad_entry", str(item)))
-            elif code not in configured:
-                configured.append(code)
-    else:
-        errors.append(("bad_list", ""))
+    match raw_languages:
+        case None:
+            configured = None
+        case list() as items:
+            configured = []
+            for item in items:
+                code = normalize_lang_code(item) if isinstance(item, str) else None
+                if code is None:
+                    errors.append(("bad_entry", str(item)))
+                elif code not in configured:
+                    configured.append(code)
+        case _:
+            errors.append(("bad_list", ""))
 
     valid: List[str] = []
     for code in configured or list(DEFAULT_SUPPORTED_LANGS):
@@ -202,14 +200,15 @@ def describe_lang_errors() -> List[str]:
     supported_langs()
     messages: List[str] = []
     for kind, detail in _language_errors:
-        if kind == "missing_file":
-            messages.append(tr("msg.lang.missing_file").format(lang=detail))
-        elif kind == "bad_entry":
-            messages.append(tr("msg.lang.bad_entry").format(value=detail))
-        elif kind == "bad_list":
-            messages.append(tr("msg.lang.bad_list"))
-        elif kind == "bad_config":
-            messages.append(tr("msg.lang.bad_config"))
-        elif kind == "empty":
-            messages.append(tr("msg.lang.empty"))
+        match kind:
+            case "missing_file":
+                messages.append(tr("msg.lang.missing_file").format(lang=detail))
+            case "bad_entry":
+                messages.append(tr("msg.lang.bad_entry").format(value=detail))
+            case "bad_list":
+                messages.append(tr("msg.lang.bad_list"))
+            case "bad_config":
+                messages.append(tr("msg.lang.bad_config"))
+            case "empty":
+                messages.append(tr("msg.lang.empty"))
     return messages

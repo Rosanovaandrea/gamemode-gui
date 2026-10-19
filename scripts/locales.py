@@ -111,15 +111,16 @@ def check(locale_dir: str = DEFAULT_LOCALE) -> int:
 def main(argv: list[str]) -> int:
     command = argv[1] if len(argv) > 1 else "check"
     args = argv[2:]
-    if command == "convert":
-        convert(*args)
-    elif command == "compile":
-        compile_catalogs(*args)
-    elif command == "check":
-        return check(*args)
-    else:
-        print(__doc__)
-        return 2
+    match command:
+        case "convert":
+            convert(*args)
+        case "compile":
+            compile_catalogs(*args)
+        case "check":
+            return check(*args)
+        case _:
+            print(__doc__)
+            return 2
     return 0
 
 

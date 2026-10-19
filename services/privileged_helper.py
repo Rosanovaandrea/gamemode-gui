@@ -61,32 +61,25 @@ def main(argv: list[str]) -> int:
     command, target = argv[0], argv[1]
 
     try:
-        if command == "commit":
-            content = sys.stdin.read()
-            seed_path = argv[2] if len(argv) > 2 else None
-            fileops.write_commit(target, content,
-                                 orig_seed_content=_read_seed(seed_path))
-            sys.stdout.write("ok\n")
-        elif command == "restore-backup":
-            fileops.restore_from_backup(target)
-            sys.stdout.write("ok\n")
-        elif command == "restore-orig":
-            fileops.restore_from_orig(target)
-            sys.stdout.write("ok\n")
-        elif command == "ensure-orig":
-            content = sys.stdin.read()
-            fileops.ensure_orig(target, seed_content=content)
-            sys.stdout.write("ok\n")
-        else:
-            sys.stderr.write(f"unknown command: {command}\n")
-            return 2
+        match command:
+            case "commit":
+                content = sys.stdin.read()
+                seed_path = argv[2] if len(argv) > 2 else None
+                fileops.write_commit(target, content,
+                                     orig_seed_content=_read_seed(seed_path))
+            case "restore-backup":
+                fileops.restore_from_backup(target)
+            case "restore-orig":
+                fileops.restore_from_orig(target)
+            case "ensure-orig":
+                fileops.ensure_orig(target, seed_content=sys.stdin.read())
+            case _:
+                sys.stderr.write(f"unknown command: {command}\n")
+                return 2
+        sys.stdout.write("ok\n")
     except OSError as exc:
         sys.stderr.write(f"error: {exc}\n")
         return 1
-    except FileNotFoundError as exc:
-        sys.stderr.write(f"error: {exc}\n")
-        return 1
-
     return 0
 
 

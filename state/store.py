@@ -42,35 +42,41 @@ class AppStore:
         state = _deep(state) if state else _initial_state()
         sections = state["sections"]
         action_type = getattr(action, "type", "")
-
-        if action_type == INIT_SECTION:
-            section_id, values = action.payload
-            merged = {**_deep(self._defaults.get(section_id, {})),
-                      **_deep(values), **sections.get(section_id, {})}
-            sections[section_id] = merged
-        elif action_type == SET_OPTION:
-            section_id, key, value = action.payload
-            values = dict(sections.get(section_id, self._defaults.get(section_id, {})))
-            values[key] = _deep(value)
-            sections[section_id] = values
-            state["dirty"] = True
-        elif action_type == LOAD_SECTION:
-            section_id, values, append = action.payload
-            current = dict(sections.get(section_id, self._defaults.get(section_id, {})))
-            for key, value in values.items():
-                if append and isinstance(current.get(key), list) and isinstance(value, list):
-                    current[key] = current[key] + list(value)
-                else:
-                    current[key] = _deep(value)
-            sections[section_id] = current
-            state["dirty"] = True
-        elif action_type == RESET_SECTION:
-            section_id = action.payload
-            sections[section_id] = _deep(self._defaults.get(section_id, {}))
-            state["dirty"] = True
-        elif action_type == SET_DIRTY:
-            state["dirty"] = bool(action.payload)
+        match action_type:
+            case _ if action_type == INIT_SECTION:
+                section_id, values = action.payload
+                sections[section_id] = {
+                    **_deep(self._defaults.get(section_id, {})),
+                    **_deep(values),
+                    **sections.get(section_id, {}),
+                }
+            case _ if action_type == SET_OPTION:
+                section_id, key, value = action.payload
+                values = dict(sections.get(section_id, self._defaults.get(section_id, {})))
+                values[key] = _deep(value)
+                sections[section_id] = values
+                state["dirty"] = True
+            case _ if action_type == LOAD_SECTION:
+                section_id, values, append = action.payload
+                current = dict(sections.get(section_id, self._defaults.get(section_id, {})))
+                for key, value in values.items():
+                    current[key] = self._merged_value(current.get(key), value, append)
+                sections[section_id] = current
+                state["dirty"] = True
+            case _ if action_type == RESET_SECTION:
+                section_id = action.payload
+                sections[section_id] = _deep(self._defaults.get(section_id, {}))
+                state["dirty"] = True
+            case _ if action_type == SET_DIRTY:
+                state["dirty"] = bool(action.payload)
         return state
+
+    @staticmethod
+    def _merged_value(previous, value, append: bool):
+        """Replace a value, or append to it when both sides are lists."""
+        if append and isinstance(previous, list) and isinstance(value, list):
+            return [*previous, *_deep(value)]
+        return _deep(value)
 
     # -- store API -----------------------------------------------------------
     def _received(self, root: dict) -> None:
@@ -118,13 +124,14 @@ class AppStore:
 
         def forward(root: dict) -> None:
             values = root["sections"].get(section_id, {})
-            if values != last["values"]:
-                last["values"] = _deep(values)
-                listener(values)
+            if values == last["values"]:
+                return
+            last["values"] = _deep(values)
+            listener(values)
 
         return self.subscribe(forward)
 
 
 def section_defaults(options: Iterable) -> dict:
     """Build the default values mapping from an option list."""
-    return {option.key: _deep(option.default) for option in options}
+    return {option_spec.key: _deep(option_spec.default) for option_spec in options}

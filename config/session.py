@@ -32,12 +32,15 @@ def load_session(config_path: str) -> Optional[Dict[str, object]]:
         return None
     if not isinstance(data, dict):
         return None
-    categories = data.get("categories")
-    if isinstance(categories, dict):
-        flat: Dict[str, object] = {}
-        for section, options in categories.items():
-            if isinstance(options, dict):
-                for key, value in options.items():
-                    flat[f"{section}.{key}"] = value
-        return flat
-    return data.get("values") if isinstance(data.get("values"), dict) else None
+    match data.get("categories"):
+        case dict() as categories:
+            flat: Dict[str, object] = {}
+            for section, options in categories.items():
+                match options:
+                    case dict():
+                        for key, value in options.items():
+                            flat[f"{section}.{key}"] = value
+            return flat
+        case _:
+            values = data.get("values")
+            return values if isinstance(values, dict) else None
