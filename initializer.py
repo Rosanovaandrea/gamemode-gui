@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 import i18n
 from core import AppCore, load_session, resolve_base_path, resolve_config_path
+from gamemode_gui.state import AppStore
 from sections.cpu import initializer as cpu_initializer
 from sections.cpu.core import CpuCore
 from sections.custom import initializer as custom_initializer
@@ -75,11 +76,12 @@ def _configuration_texts(config_path: str) -> Tuple[str, str, Optional[Dict[str,
 
 
 def _build_sections(base_text: str, override_text: str,
-                    session_values: Optional[Dict[str, object]]) -> List:
+                    session_values: Optional[Dict[str, object]],
+                    store: AppStore) -> List:
     """Create and initialize every section core."""
     sections: List = []
     for _section_id, (core_class, initializer_module) in SECTION_MODULES.items():
-        section_core = core_class()
+        section_core = core_class(store=store)
         initializer_module.initialize(section_core, base_text, override_text,
                                       session_values)
         sections.append(section_core)
@@ -90,14 +92,16 @@ def build_app(config_path: Optional[str] = None) -> App:
     """Build the whole application state, ready for the UI."""
     config_path = config_path or resolve_config_path()
     base_text, override_text, session_values = _configuration_texts(config_path)
-    sections = _build_sections(base_text, override_text, session_values)
+    store = AppStore()
+    sections = _build_sections(base_text, override_text, session_values, store)
 
     # The pristine baseline is the active file as it was (empty on a fresh
     # install); seeding it with the base would duplicate list values on a
     # factory reset, because the daemon already merges the base with /etc.
     app_core = AppCore(config_path=config_path, base_path=resolve_base_path(),
-                       sections=sections, orig_seed="")
+                       sections=sections, orig_seed="", store=store)
     app_core.config_manager.ensure_orig_on_first_run("")
+    store.set_dirty(False)
     i18n.ensure_settings()
     return App(core=app_core, config_path=config_path,
                base_path=app_core.base_path)
@@ -110,3 +114,4 @@ def reload(app: App) -> None:
         initializer_module = SECTION_MODULES[section_core.section_id][1]
         initializer_module.initialize(section_core, base_text, override_text,
                                       session_values)
+    app.core.store.set_dirty(False)

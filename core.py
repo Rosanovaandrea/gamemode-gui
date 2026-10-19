@@ -198,10 +198,11 @@ class AppCore:
     """Orchestrates the sections and performs the app-wide operations."""
 
     def __init__(self, config_path: str, base_path: Optional[str],
-                 sections: List, orig_seed: str = "") -> None:
+                 sections: List, orig_seed: str = "", store=None) -> None:
         self.config_path = config_path
         self.base_path = base_path
         self.sections = list(sections)
+        self.store = store
         self.config_manager = ConfigManager(config_path, orig_seed=orig_seed)
 
     def render(self) -> str:
@@ -224,6 +225,8 @@ class AppCore:
         """Commit the combined content atomically and persist the session."""
         self.config_manager.save(self.render())
         save_session(self.config_path, self.collect_values())
+        if self.store is not None:
+            self.store.set_dirty(False)
 
     def restore_previous(self) -> bool:
         """Restore the previous state (``.bak``); True on success."""
